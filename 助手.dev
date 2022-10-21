@@ -1,0 +1,136 @@
+﻿[Project]
+FileName = 助手.dev
+Name = StudentManager
+Type = 0
+Ver = 3
+ObjFiles = 
+Includes = 
+Libs = 
+PrivateResource = 助手_private.rc
+ResourceIncludes = 
+MakeIncludes = 
+Compiler = 
+CppCompiler = 
+Linker =  C:/Windows/System32/comctl32.dll
+IsCpp = 1
+Icon = app.ico
+ExeOutput = 
+ObjectOutput = 
+LogOutput = 
+LogOutputEnabled = 0
+OverrideOutput = 0
+OverrideOutputName = 
+HostApplication = 
+UseCustomMakefile = 0
+CustomMakefile = 
+CommandLine = 
+Folders = 
+IncludeVersionInfo = 1
+SupportXPThemes = 0
+CompilerSet = 1
+UnitCount = 4
+UsePrecompiledHeader = 0
+PrecompiledHeader = 
+CompilerSetType = 0
+StaticLink = 0
+AddCharset = 1
+Encoding = AUTO
+ModelType = 1
+UseUTF8 = 0
+
+
+[VersionInfo]
+Major = 1
+Minor = 0
+Release = 0
+Build = 0
+LanguageID = 2052
+CharsetID = 1252
+CompanyName = 
+FileVersion = 
+FileDescription = 极 域 机 房 工 具 箱
+InternalName = 
+LegalCopyright = 
+LegalTrademarks = 
+OriginalFilename = 
+ProductName = 
+ProductVersion = 
+AutoIncBuildNr = 0
+SyncProduct = 1
+
+
+[Unit1]
+FileName = main.cpp
+CompileCpp = 1
+Folder = 
+Compile = 1
+Link = 1
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+DetectEncoding = 1
+
+
+[Unit2]
+FileName = resource.rc
+Folder = Resources
+Compile = 1
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+DetectEncoding = 1
+CompileCpp = 0
+
+
+[Unit3]
+FileName = sys.manifest
+CompileCpp = 0
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+DetectEncoding = 1
+
+
+[Unit4]
+FileName = app.ico
+CompileCpp = 0
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+DetectEncoding = 1
+
+
+[Unit5]
+FileName = sys.manifest
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+DetectEncoding = 1
+
+
+[Unit6]
+FileName = app.ico
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+DetectEncoding = 1
+
+
+[CompilerSettings]
+cc_cmd_opt_debug_info = on
+cc_cmd_opt_use_pipe = on
+cc_cmd_opt_warning_all = on
+cc_cmd_opt_warning_extra = on
