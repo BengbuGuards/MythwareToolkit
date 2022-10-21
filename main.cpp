@@ -4,96 +4,110 @@
 #include <cstdio>
 #include <tlhelp32.h>
 #include <ctime>
-#include "uiaccess.h"
-#include "commctrl.h"
-#define KEY_DOWN(VK_NONAME) ((GetAsyncKeyState(VK_NONAME) & 0x8000) ? 1:0)
+#include <commctrl.h>
 using namespace std;
 BOOL GetMythwarePasswordFromRegedit(char *str);
 DWORD GetProcessIDFromName(LPCSTR szName);
-bool KillProcess(DWORD dwProcessID);
+bool KillProcess(DWORD dwProcessID, int way);
 DWORD WINAPI ThreadProc(LPVOID lpParameter);
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
-bool SetupTrayIcon(HWND m_hWnd,HINSTANCE hInstance);
+bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance);
+BOOL EnableDebugPrivilege();
+DWORD WINAPI Update(LPVOID lpParameter);
 
-HWND hwnd; /* A 'HANDLE', hence the H, or a pointer to our window */
+HWND hwnd,last; /* A 'HANDLE', hence the H, or a pointer to our window */
 /* This is where all the input to the window goes to */
+#define KILL_FORCE 1
+#define KILL_DEFAULT 2
 LPCSTR MythwareFilename = "StudentMain.exe";
-HFONT hFont = CreateFont(-12, -6, 0, 0, 0, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, TEXT("微软雅黑"));
+HFONT hFont;
 NOTIFYICONDATA icon;
-HMENU hMenu;
+HMENU hMenu;//托盘菜单
 char*path;
-int width = 528, height = 250;
-//HWND BtKbH;
-HWND BtAbt;LPCSTR helpText="极域工具包\n\
+int width = 528, height = 250, w, h;
+HWND BtAbt, TxOut, TxLnk, BtTop, BtCur, BtKbh;
+LPCSTR helpText = "极域工具包\n\
 额外功能：快捷键Shift+K杀掉助手，Shift+W最小化顶层窗口\n\
 当鼠标移至屏幕左上角时，可以选择最小化顶层窗口\n\
 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
 解禁工具提示设置失败，可能是无权限或指定注册表键值不存在，在此情况下，通常本身就无需解禁";
-HANDLE thread;//用来刷新置顶，用Timer会有bug
-//HWND TxPsd;
-HWND TxOut;
-/*HWND BtKps;
-HWND BtKhp;
-HWND RCG;
-HWND BtEnCmd;
-HWND BtEnReg;
-HWND BtEnTgr;
-HWND BtEnRun;
-HWND BtEnTsk;
-HWND BtRsExp;
-HWND BtEnUsb;
-HWND BtEnLgf;*/
+HANDLE thread/*用来刷新置顶，用Timer会有bug*/,keyHook/*解键盘锁*/;
+UINT WM_TASKBAR;
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
 	POINT p;
-	UINT WM_TASKBAR=RegisterWindowMessage(TEXT("TaskbarCreated"));
 	POINT pt;
 	switch (Message) {
 		case WM_CREATE: {
+			EnableDebugPrivilege();//提权
+			w = GetSystemMetrics(SM_CXSCREEN);//屏幕宽度（注意比实际宽度多1，所以用到的地方都要-1）
+			h = GetSystemMetrics(SM_CYSCREEN);//屏幕高度
+			NONCLIENTMETRICS info;
+			info.cbSize = sizeof(NONCLIENTMETRICS);
+			if (SystemParametersInfo (SPI_GETNONCLIENTMETRICS, 0, &info, 0))
+			{
+				hFont = CreateFontIndirect ((LOGFONT*)&info.lfMessageFont);
+			}//取系统默认字体
+			WM_TASKBAR = RegisterWindowMessage(TEXT("TaskbarCreated"));
 			thread = CreateThread(NULL, 0, ThreadProc, NULL, 0, NULL);//置顶窗口
-			SetTimer(hwnd,1,1000,NULL);//检测鼠标左上角
+			keyHook = CreateThread(NULL, 0, Update, NULL, CREATE_SUSPENDED, NULL);//键盘锁
+			SetTimer(hwnd, 1, 1000, NULL); //检测鼠标左上角
 			RegisterHotKey(hwnd, 0, MOD_SHIFT, 75); //Shift+K杀掉助手
-			RegisterHotKey(hwnd, 1, MOD_SHIFT, 87); //Shift+W最小化顶层窗口	
-			CreateWindow(TEXT("static"), TEXT("极域工具包"), WS_CHILD | WS_VISIBLE | WS_TABSTOP, 8, 8, 120, 20, hwnd, HMENU(1), ((LPCREATESTRUCT) lParam)->hInstance, NULL);			BtAbt = CreateWindow(TEXT("button"), TEXT("关于/帮助"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 166, 3, 90, 30, hwnd, HMENU(2), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
+			RegisterHotKey(hwnd, 1, MOD_SHIFT, 87); //Shift+W最小化顶层窗口
+			HINSTANCE hi = ((LPCREATESTRUCT) lParam)->hInstance;
+			TxLnk = CreateWindow(TEXT("SysLink"), TEXT("极域工具包 <a href=\"https://blog.csdn.net/weixin_42112038?type=blog\">博客</a>"), WS_CHILD | WS_VISIBLE | WS_TABSTOP, 8, 8, 120, 20, hwnd, HMENU(1), hi, NULL);
+			BtAbt = CreateWindow(TEXT("Button"), TEXT("关于/帮助"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 166, 3, 90, 30, hwnd, HMENU(2), hi, NULL);
 			//获取密码
-			char str[MAX_PATH * 10] = {0};
+			char str[MAX_PATH] = {0};
 			LPCSTR psd;
 			if (GetMythwarePasswordFromRegedit(str) == FALSE) {
 				psd = TEXT("获取密码失败");
 			} else {
 				psd = TEXT(str);
 			}
-			CreateWindow(TEXT("edit"), psd, WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_BORDER | ES_READONLY, 8, 36, 248, 20, hwnd, HMENU(3), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("杀掉极域"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 8, 122, 248, 50, hwnd, HMENU(4), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("杀掉学生机房管理助手"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,  8, 64, 248, 50, hwnd, HMENU(13), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			TxOut = CreateWindow(TEXT("static"), TEXT("等待操作"), WS_CHILD | WS_VISIBLE | WS_TABSTOP, 8, 188, 248, 20, hwnd, HMENU(5), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解除禁用工具"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_GROUPBOX, 264, 8, 248, 174, hwnd, HMENU(6), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解除cmd限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 28, 112, 30, hwnd, HMENU(7), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解禁注册表编辑器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 28, 112, 30, hwnd, HMENU(8), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解禁任务管理器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 66, 112, 30, hwnd, HMENU(9), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解禁Win+R运行"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 66, 112, 30, hwnd, HMENU(10), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解禁taskkill"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 104, 112, 30, hwnd, HMENU(11), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("重启资源管理器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 104, 112, 30, hwnd, HMENU(12), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解除助手USB限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 142, 112, 30, hwnd, HMENU(14), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
-			CreateWindow(TEXT("button"), TEXT("解禁注销账户"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 142, 112, 30, hwnd, HMENU(15), ((LPCREATESTRUCT) lParam)->hInstance, NULL);
+			CreateWindow(TEXT("Edit"), psd, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_READONLY, 8, 36, 248, 20, hwnd, HMENU(3), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("杀掉极域"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 8, 122, 248, 50, hwnd, HMENU(4), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("杀掉学生机房管理助手"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY,  8, 64, 248, 50, hwnd, HMENU(13), hi, NULL);
+			TxOut = CreateWindow(TEXT("msctls_statusbar32"), TEXT("等待操作"), WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, hwnd, HMENU(5), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解除禁用工具"), WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 264, 8, 248, 174, hwnd, HMENU(6), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解除cmd限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 272, 28, 112, 30, hwnd, HMENU(7), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解禁注册表编辑器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 392, 28, 112, 30, hwnd, HMENU(8), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解禁任务管理器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 272, 66, 112, 30, hwnd, HMENU(9), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解禁Win+R运行"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 392, 66, 112, 30, hwnd, HMENU(10), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解禁taskkill"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 272, 104, 112, 30, hwnd, HMENU(11), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("重启资源管理器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 392, 104, 112, 30, hwnd, HMENU(12), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解除助手USB限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 272, 142, 112, 30, hwnd, HMENU(14), hi, NULL);
+			CreateWindow(TEXT("Button"), TEXT("解禁注销账户"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | BS_NOTIFY, 392, 142, 112, 30, hwnd, HMENU(15), hi, NULL);
+			BtTop = CreateWindow(TEXT("Button"), TEXT("置顶此窗口"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 8, 176, 77, 18, hwnd, HMENU(16), hi, NULL);
+			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, NULL);
+			BtCur = CreateWindow(TEXT("Button"), TEXT("解除鼠标限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 90, 176, 87, 18, hwnd, HMENU(17), hi, NULL);
+			BtKbh = CreateWindow(TEXT("Button"), TEXT("解键盘锁"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 183, 176, 87, 18, hwnd, HMENU(18), hi, NULL);
 			EnumChildWindows(hwnd, SetWindowFont, (LPARAM)0);
-			hMenu=CreatePopupMenu();
-			AppendMenu(hMenu,MF_STRING,1,TEXT("关闭程序"));
-			AppendMenu(hMenu,MF_STRING,2,TEXT("打开界面"));
-			SetupTrayIcon(hwnd,((LPCREATESTRUCT) lParam)->hInstance);
+			hMenu = CreatePopupMenu();
+			AppendMenu(hMenu, MF_STRING, 1, TEXT("关闭程序"));
+			AppendMenu(hMenu, MF_STRING, 2, TEXT("打开界面"));
+			SetupTrayIcon(hwnd, hi);
 			break;
 		}
 		case WM_COMMAND: {
+			if(HIWORD(wParam)==BN_SETFOCUS){
+				last=HWND(lParam);
+				SetWindowLong(last,GWL_STYLE,GetWindowLong(last,GWL_STYLE)|BS_DEFPUSHBUTTON);
+			}
+			else if(HIWORD(wParam)==BN_KILLFOCUS)	
+			{
+				SetWindowLong(last,GWL_STYLE,GetWindowLong(last,GWL_STYLE)^BS_DEFPUSHBUTTON);
+			}
 			switch (wParam) {
 				case 1: {
 					break;
 				}
 				case 2: {
-					MessageBox(NULL,helpText,"关于/帮助",MB_OK|MB_ICONINFORMATION);
+					MessageBox(NULL, helpText, "关于/帮助", MB_OK | MB_ICONINFORMATION);
 					break;
 				}
 				case 4: {
-					if (KillProcess(GetProcessIDFromName(MythwareFilename))) {
+					if (KillProcess(GetProcessIDFromName(MythwareFilename), KILL_FORCE)) {
 						SetWindowText(TxOut, "执行成功");
 					} else {
 						SetWindowText(TxOut, "执行失败");
@@ -195,14 +209,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 12: {
-					if (KillProcess(GetProcessIDFromName("explorer.exe") ) == FALSE) {
+					/*if (KillProcess(GetProcessIDFromName("explorer.exe") ) == FALSE) {
 						SetWindowText(TxOut, "执行失败");
 						break;
 					}
 					Sleep(200);
 					//打开资源管理器
-					WinExec("start explorer.exe", SW_HIDE);
-					SetWindowText(TxOut, "执行成功");
+					WinExec("start explorer.exe", SW_HIDE);*/
+					HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, GetProcessIDFromName("explorer.exe"));
+					if (TerminateProcess(handle, 2))
+						SetWindowText(TxOut, "执行成功");
+					else
+						SetWindowText(TxOut, "执行失败");
+					CloseHandle(handle);
 					break;
 				}
 				case 13: {
@@ -213,18 +232,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					RegQueryValueEx(retKey, "Version", NULL, NULL, (LPBYTE)&version, &size);
 					RegCloseKey(retKey);
 					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "读取失败");
+						SetWindowText(TxOut, "执行失败，可能未安装学生机房管理助手");
 						break;
 					}
 					//取时间用于计算prozs.exe的随机进程名
 					time_t curtime;
 					time(&curtime);
 					tm *nowtime = localtime(&curtime);
-					int n3 = 1 + nowtime->tm_mon + nowtime->tm_mday;int n4, n5, n6;
-					char c1, c2, c3, c4;
+					int n3 = 1 + nowtime->tm_mon + nowtime->tm_mday;
+					int n4, n5, n6;
 					DWORD prozsPid;
-					if (version[0]=='7'&&version[2]=='2') {
-						
+					if (version[0] == '7' && version[2] == '2') {
+						char c1, c2, c3, c4;
 						//以下为7.2版本逻辑
 						n4 = n3 % 7, n5 = n3 % 9, n6 = n3 % 5;
 						if (n3 % 2 != 0) {
@@ -233,21 +252,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 							c1 = 97 + n4,   c2 = 109 + n5,  c3 = 101 + n6,  c4 = 48 + n5;
 						}
 						char c[5] = {c1, c2, c3, c4, '\0'};
-						prozsPid = GetProcessIDFromName(strcat(c, ".exe")); //取得pid
+						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
 					} else {
 						//以下为7.2版本之前的逻辑
 						n4 = n3 % 3 + 3, n5 = n3 % 4 + 4;
-						char str[4];
-						str[0] = 'p';
+						char c[4] = {'p', 0, 0, '\0'};
 						if (n3 % 2 != 0)
-							str[1] = n4 + 102, str[2] = n5 + 98;
+							c[1] = n4 + 102, c[2] = n5 + 98;
 						else
-							str[1] = n4 + 99,  str[2] = n5 + 106;
-						str[3] = '\0';
-						prozsPid = GetProcessIDFromName(strcat(str, ".exe"));
+							c[1] = n4 + 99,  c[2] = n5 + 106;
+						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
 					}
-					KillProcess(prozsPid);
-					KillProcess(GetProcessIDFromName("jfglzs.exe"));
+					KillProcess(prozsPid, KILL_DEFAULT);
+					KillProcess(GetProcessIDFromName("jfglzs.exe"), KILL_DEFAULT);
 					SetWindowText(TxOut, "执行成功");
 					break;
 				}
@@ -289,13 +306,40 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					SetWindowText(TxOut, "设置成功");
 					break;
 				}
+				case 16:{
+					LRESULT check = SendMessage(BtTop, BM_GETCHECK, NULL, NULL);
+					if (check == BST_CHECKED) {
+						ResumeThread(thread);
+					} else {
+						SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+						SuspendThread(thread);
+					}
+					break;
+				}
+				case 17:{
+					LRESULT check = SendMessage(BtCur, BM_GETCHECK, NULL, NULL);
+					if (check == BST_CHECKED) {
+						SetTimer(hwnd, 2, 10, NULL);
+					} else {
+						KillTimer(hwnd, 2);
+					}
+					break;
+				}
+				case 18:{
+					LRESULT check = SendMessage(BtKbh, BM_GETCHECK, NULL, NULL);
+					if (check == BST_CHECKED) {
+						ResumeThread(keyHook);
+					} else {
+						SuspendThread(keyHook);
+					}
+					break;
+				}
 			}
-			break;
 		}
 		case WM_HOTKEY:
 			switch (wParam) {
 				case 0://Shift+K
-					WndProc(hwnd, WM_COMMAND, 13, lParam);
+					SendMessage(hwnd, WM_COMMAND, 13, lParam);
 					break;
 				case 1://Shift+W
 					HWND topHwnd = GetForegroundWindow();
@@ -311,50 +355,83 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					GetCursorPos(&p);
 					if (p.x == 0 && p.y == 0) {
 						HWND topHwnd = GetForegroundWindow();
-						if (MessageBox(hwnd,"检测到了鼠标位置变化！是否最小化置顶窗口？", "实时监测", MB_YESNO | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST) == IDYES) {
+						if (MessageBox(hwnd, "检测到了鼠标位置变化！是否最小化置顶窗口？", "实时监测", MB_YESNO | MB_ICONINFORMATION | MB_SETFOREGROUND) == IDYES) {
 							ShowWindow(topHwnd, SW_MINIMIZE);
 						}
 					}
+					else if(p.x == w-1 && p.y==0){
+						HWND topHwnd = GetForegroundWindow();
+						if (MessageBox(hwnd, "检测到了鼠标位置变化！是否关闭置顶窗口？", "实时监测", MB_YESNO | MB_ICONINFORMATION | MB_SETFOREGROUND) == IDYES) {
+							PostMessage(topHwnd,WM_CLOSE,0,0);//异步
+						}
+					}
 					break;
+				case 2:
+					ClipCursor(0);
 			}
 			break;
 		case WM_DESTROY:
 			UnregisterHotKey(hwnd, 0);
 			UnregisterHotKey(hwnd, 1);
-			TerminateThread(thread,0);
-			KillTimer(hwnd,1);
-			Shell_NotifyIcon(NIM_DELETE,&icon);//删除托盘图标，否则只有鼠标划过图标才消失
+			TerminateThread(thread, 0);
+			KillTimer(hwnd, 1);
+			KillTimer(hwnd, 2);
+			Shell_NotifyIcon(NIM_DELETE, &icon); //删除托盘图标，否则只有鼠标划过图标才消失
 			PostQuitMessage(0);
 			break;
-		case WM_SIZE:
-			if(wParam==SIZE_MINIMIZED)
-				ShowWindow(hwnd,SW_HIDE);//隐藏
-			break;
 		case WM_USER:
-			if(lParam==WM_LBUTTONDBLCLK){//左键双击
-				ShowWindow(hwnd,SW_SHOWNORMAL);
+			if (lParam == WM_LBUTTONDBLCLK) { //左键双击
+				ShowWindow(hwnd, SW_SHOWNORMAL);
 				SetForegroundWindow(hwnd);
-			}
-			else if(lParam==WM_RBUTTONUP){//右键单击
+			} else if (lParam == WM_RBUTTONUP) { //右键单击
 				GetCursorPos(&pt);
 				SetForegroundWindow(hwnd);
-				int i=TrackPopupMenu(hMenu,TPM_RETURNCMD,pt.x,pt.y,NULL,hwnd,NULL);
-				switch(i){
+				int i = TrackPopupMenu(hMenu, TPM_RETURNCMD, pt.x, pt.y, NULL, hwnd, NULL);
+				switch (i) {
 					case 1:
 						//TODO
-						WndProc(hwnd,WM_CLOSE,NULL,NULL);
+						PostMessage(hwnd, WM_CLOSE, 0, 0);
 						break;
 					case 2:
-						ShowWindow(hwnd,SW_SHOWNORMAL);
+						ShowWindow(hwnd, SW_SHOWNORMAL);
 						SetForegroundWindow(hwnd);
 						break;
 				}
 			}
 			break;
+		case WM_NOTIFY:
+			switch (((LPNMHDR)lParam)->code) {
+				case NM_CLICK:
+					if (((LPNMHDR)lParam)->hwndFrom == TxOut) {
+						break;
+					}
+				case NM_RETURN: {
+					PNMLINK pNMLink = (PNMLINK)lParam;
+					LITEM   item    = pNMLink->item;
+					if ((((LPNMHDR)lParam)->hwndFrom == TxLnk) && (item.iLink == 0)) {
+						char lnk[L_MAX_URL_LENGTH];
+						WideCharToMultiByte(CP_ACP, 0, item.szUrl, L_MAX_URL_LENGTH, lnk, L_MAX_URL_LENGTH, NULL, NULL);
+						ShellExecute(NULL, "open", lnk, NULL, NULL, SW_SHOW);
+					} else if (wcscmp(item.szID, L"idInfo") == 0) {
+						MessageBox(hwnd, "This isn't much help.", "Example", MB_OK);
+					}
+					break;
+				}
+			}
+
+			break;
+		case WM_LBUTTONDOWN:
+			SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+			break;
+		case WM_SIZE:
+			if (wParam == SIZE_MINIMIZED){
+				ShowWindow(hwnd, SW_HIDE); //隐藏
+				break;
+			}
 		/* All other messages (a lot of them) are processed using default procedures */
 		default:
-			if(Message==WM_TASKBAR)
-				SetupTrayIcon(hwnd,((LPCREATESTRUCT) lParam)->hInstance);
+			if (Message == WM_TASKBAR)
+				Shell_NotifyIcon(NIM_ADD, &icon);
 			return DefWindowProc(hwnd, Message, wParam, lParam);
 	}
 	return 0;
@@ -424,7 +501,6 @@ DWORD GetProcessIDFromName(LPCSTR szName) {
 	return id;
 }
 
-
 //https://blog.csdn.net/liu_zhou_zhou/article/details/118603143
 BOOL GetMythwarePasswordFromRegedit(char *str) {
 	HKEY retKey;
@@ -461,23 +537,30 @@ BOOL GetMythwarePasswordFromRegedit(char *str) {
 }
 
 //用杀掉每个线程的方法解决某些进程hook住了TerminateProcess()的问题
-bool KillProcess(DWORD dwProcessID) {
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(
-	                   TH32CS_SNAPTHREAD, dwProcessID);
+bool KillProcess(DWORD dwProcessID, int way) {
+	if (way == KILL_FORCE) {
+		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, dwProcessID);
 
-	if (hSnapshot != INVALID_HANDLE_VALUE) {
+		if (hSnapshot != INVALID_HANDLE_VALUE) {
 
-		THREADENTRY32 te = {sizeof(te)};
-		BOOL fOk = Thread32First(hSnapshot, &te);
-		for (; fOk; fOk = Thread32Next(hSnapshot, &te)) {
-			if (te.th32OwnerProcessID == dwProcessID) {
-				HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te.th32ThreadID);
-				TerminateThread(hThread, 0);
-				CloseHandle(hThread);
+			THREADENTRY32 te = {sizeof(te)};
+			BOOL fOk = Thread32First(hSnapshot, &te);
+			for (; fOk; fOk = Thread32Next(hSnapshot, &te)) {
+				if (te.th32OwnerProcessID == dwProcessID) {
+					HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te.th32ThreadID);
+					TerminateThread(hThread, 0);
+					CloseHandle(hThread);
+				}
 			}
+			CloseHandle(hSnapshot);
+			return true;
 		}
-		CloseHandle(hSnapshot);
-		return true;
+		return false;
+	} else if (way == KILL_DEFAULT) {
+		HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, dwProcessID);
+		WINBOOL sta = TerminateProcess(handle, 0);
+		CloseHandle(handle);
+		return sta;
 	}
 	return false;
 }
@@ -485,23 +568,75 @@ bool KillProcess(DWORD dwProcessID) {
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	while (true) {
 		SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		Sleep(40);
+		Sleep(40);//无需过快置顶，这个东西特别耗CPU
 	}
 	return 0L;
 }
 
-bool SetupTrayIcon(HWND m_hWnd,HINSTANCE hInstance) {
+bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
 	icon.cbSize = sizeof(NOTIFYICONDATA); // 结构大小
 	icon.hWnd = m_hWnd; // 接收 托盘通知消息 的窗口句柄
 	icon.uID = 0;
-	icon.uFlags = NIF_ICON|NIF_MESSAGE|NIF_TIP; //表示uCallbackMessage 有效
+	icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; //表示uCallbackMessage 有效
 	icon.uCallbackMessage = WM_USER; // 消息被发送到此窗口过程
-	icon.hIcon = LoadIcon(hInstance, "A"); 
+	icon.hIcon = LoadIcon(hInstance, "A");
 	strcpy(icon.szTip, "极域工具包");             // 提示文本
 	return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
 }
 
+HOOKPROC KeyboardProc;
+//https://www.52pojie.cn/thread-542884-1-1.html 有删改
+DWORD WINAPI Update(LPVOID lpParameter)
+{
+	HHOOK m_hHOOK1 = NULL, m_hHOOK2 = NULL,m_hHOOK3 = NULL,m_hHOOK4 = NULL; 
+	m_hHOOK1 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+	m_hHOOK2 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+	m_hHOOK3 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+	m_hHOOK4 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+	while(true)
+	{
+		UnhookWindowsHookEx(m_hHOOK1);
+		UnhookWindowsHookEx(m_hHOOK3);
+		m_hHOOK1 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+		m_hHOOK3 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+		UnhookWindowsHookEx(m_hHOOK2);
+		UnhookWindowsHookEx(m_hHOOK4);
+		m_hHOOK2 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+		m_hHOOK4 = (HHOOK)SetWindowsHookEx(WH_KEYBOARD, (HOOKPROC)KeyboardProc, GetModuleHandle(NULL), 0);
+		Sleep(20);//避免占用CPU过多
+	}
+	return 0;
+}
+
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam) {
 	SendMessage(hwndChild, WM_SETFONT, WPARAM(hFont), 0);
+	return TRUE;
+}
+
+//https://blog.csdn.net/zuishikonghuan/article/details/47746451
+BOOL EnableDebugPrivilege()
+{
+	HANDLE hToken;
+	LUID Luid;
+	TOKEN_PRIVILEGES tp;
+	
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))return FALSE;
+	
+	if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &Luid))
+	{
+		CloseHandle(hToken);
+		return FALSE;
+	}
+	
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = Luid;
+	tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+	
+	if (!AdjustTokenPrivileges(hToken, false, &tp, sizeof(tp), NULL, NULL))
+	{
+		CloseHandle(hToken);
+		return FALSE;
+	}
+	CloseHandle(hToken);
 	return TRUE;
 }
