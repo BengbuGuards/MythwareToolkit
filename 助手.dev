@@ -27,12 +27,12 @@ CommandLine =
 Folders = 
 IncludeVersionInfo = 1
 SupportXPThemes = 0
-CompilerSet = 1
+CompilerSet = 0
 UnitCount = 4
 UsePrecompiledHeader = 0
 PrecompiledHeader = 
 CompilerSetType = 0
-StaticLink = 0
+StaticLink = 1
 AddCharset = 1
 Encoding = AUTO
 ModelType = 1
@@ -43,12 +43,12 @@ ExecEncoding = SYSTEM
 
 [VersionInfo]
 Major = 1
-Minor = 0
+Minor = 1
 Release = 0
 Build = 0
 LanguageID = 2052
 CharsetID = 1252
-CompanyName = 
+CompanyName = 小流汗黄豆
 FileVersion = 
 FileDescription = 极 域 机 房 工 具 箱
 InternalName = 
@@ -110,7 +110,7 @@ DetectEncoding = 1
 
 
 [Unit5]
-FileName = sys.manifest
+FileName = main.h
 Folder = 
 Compile = 0
 Link = 0
@@ -118,21 +118,46 @@ Priority = 1000
 OverrideBuildCmd = 0
 BuildCmd = 
 DetectEncoding = 1
+CompileCpp = 1
 
 
 [Unit6]
-FileName = app.ico
+FileName = uiaccess.h
 Folder = 
 Compile = 0
 Link = 0
 Priority = 1000
 OverrideBuildCmd = 0
 BuildCmd = 
-DetectEncoding = 1
+DetectEncoding = 0
+CompileCpp = 0
+FileEncoding = ASCII
 
 
 [CompilerSettings]
+cc_cmd_opt_abort_on_error = 
+cc_cmd_opt_ansi = 
+cc_cmd_opt_arch = 
+cc_cmd_opt_check_iso_conformance = 
 cc_cmd_opt_debug_info = on
+cc_cmd_opt_inhibit_all_warning = 
+cc_cmd_opt_instruction = 
+cc_cmd_opt_no_asm = 
+cc_cmd_opt_only_gen_asm_code = 
+cc_cmd_opt_optimize = 
+cc_cmd_opt_pointer_size = 
+cc_cmd_opt_profile_info = 
+cc_cmd_opt_std = 
+cc_cmd_opt_stop_after_preprocessing = 
+cc_cmd_opt_syntax_only = 
+cc_cmd_opt_traditional_cpp = 
+cc_cmd_opt_tune = 
 cc_cmd_opt_use_pipe = on
+cc_cmd_opt_verbose_asm = 
 cc_cmd_opt_warning_all = on
-cc_cmd_opt_warning_extra = on
+cc_cmd_opt_warning_as_error = 
+cc_cmd_opt_warning_extra = 
+link_cmd_opt_link_objc = 
+link_cmd_opt_no_console = 
+link_cmd_opt_no_link_stdlib = 
+link_cmd_opt_strip_exe = 
