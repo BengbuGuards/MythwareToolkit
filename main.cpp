@@ -1,16 +1,20 @@
-#pragma GCC optimize(2) //优化
+#pragma GCC optimize(3) //优化
 #include <windows.h>
 #include <tlhelp32.h>
 #include <winternl.h>
+#include <fltuser.h>
 #include <userenv.h>
 #include <commctrl.h>
+#include <versionhelpers.h>
 #include <string>
 #include <cstdlib>
+#include <ctime>
 BOOL GetMythwarePasswordFromRegedit(char *str);
 DWORD GetProcessIDFromName(LPCSTR szName);
 bool KillProcess(DWORD dwProcessID, int way);
 DWORD WINAPI ThreadProc(LPVOID lpParameter);
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
+BOOL CALLBACK UpdateControlDpi(HWND hwndChild, LPARAM lParam);
 bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance);
 BOOL EnableDebugPrivilege();
 DWORD WINAPI KeyHookThreadProc(LPVOID lpParameter);
@@ -19,96 +23,125 @@ BOOL SuspendProcess(DWORD dwProcessID, BOOL suspend);
 int GetProcessState(DWORD dwProcessID);
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
 std::string RandomWindowTitle();
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
+LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
+inline void PrtError(LPCSTR szDes, LRESULT lResult);
+inline LPSTR FormatLogTime();
 
+std::string sOutPut;
+#define Print(text) sOutPut=sOutPut+FormatLogTime()+text
+#define Println(text) Print(text); sOutPut+="\r\n"
 #define KILL_FORCE 1
 #define KILL_DEFAULT 2
+#define ge error = GetLastError()
 HHOOK kbdHook, mseHook;
 HWND hwnd, focus; /* A 'HANDLE', hence the H, or a pointer to our window */
 /* This is where all the input to the window goes to */
-LPCSTR MythwareFilename = "StudentMain.exe";//把这个改成别的便可以”兼容”更多电子教室
+LPCSTR MythwareFilename = "StudentMain.exe";//把这个改成别的便可以“兼容”更多电子教室
+HWND hBdCst;
 //LONG fullScreenStyle = WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN, windowingStyle = fullScreenStyle | WS_OVERLAPPEDWINDOW ^ WS_OVERLAPPED;
-HFONT hFont;
 NOTIFYICONDATA icon;
 HMENU hMenu;//托盘菜单
 int width = 528, height = 250, w, h, mwSts;
-bool asking = false, closingProcess = false;
+bool asking = false, ask = false, closingProcess = false;
 DWORD error = -1;//用于调试
 POINT p, pt;
-HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh;
-LPCSTR helpText = "极域工具包 v1.1\n\
+HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
+LPCSTR helpText = "极域工具包 v1.2\n\
 额外功能：快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
-当鼠标移至屏幕左上角/右上角时，可以选择最小化/关闭焦点窗口\n\
+当鼠标移至屏幕左上角/右上角时，可以选择最小化/关闭焦点窗口（你也可以关闭此功能）\n\
+使用菜单栏关闭本窗口时会自动最小化防误触，若要退出可在托盘关闭或Alt+F4\n\
 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
 解禁工具提示设置失败，可能是无权限或指定注册表键值不存在，在此情况下，通常本身就无需解禁\n\
-解键盘锁功能对Alt+Ctrl+Delete无效\n\
-启动时附加-s或/s命令行可以System权限启动";
+解键盘锁功能如果对Alt+Ctrl+Delete无效时，重新勾选即可；对极域的大多数操作都只在2015/2016版测试通过\n\
+启动时附加-s或/s命令行可以System权限启动\n\
+MeltdownDFC为冰点还原密码破解工具，crdisk为其他保护系统删除工具（慎用！）";
 HANDLE thread/*用来刷新置顶，用Timer会有bug*/, mouHook/*解鼠标锁*/, keyHook/*解键盘锁*/;
 UINT WM_TASKBAR;
+
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
 	switch (Message) {
 		case WM_CREATE: {
+			//获取系统版本号
+			OSVERSIONINFO vi = {sizeof(OSVERSIONINFO)};
+			GetVersionEx(&vi);
+			SYSTEM_INFO si = {};
+			GetNativeSystemInfo(&si);
+			char szVersion[BUFSIZ] = {};
+			sprintf(szVersion, "系统版本：%u.%u.%u %d-bit\n程序版本：%s %d-bit\n",
+				vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber, (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, 
+				"1.2", sizeof(PVOID)*8);
+			sOutPut += szVersion;
 			EnableDebugPrivilege();//提权
 			w = GetSystemMetrics(SM_CXSCREEN) - 1;//屏幕宽度（注意比实际宽度多1）
 			h = GetSystemMetrics(SM_CYSCREEN) - 1;//屏幕高度
-			NONCLIENTMETRICS info;
-			info.cbSize = sizeof(NONCLIENTMETRICS);
-			if (SystemParametersInfo (SPI_GETNONCLIENTMETRICS, 0, &info, 0)) {
-				hFont = CreateFontIndirect ((LOGFONT*)&info.lfMessageFont);
-			}//取系统默认字体
 			WM_TASKBAR = RegisterWindowMessage(TEXT("TaskbarCreated"));//任务栏创建事件
 			thread = CreateThread(NULL, 0, ThreadProc, NULL, 0, NULL);//置顶窗口
 			keyHook = CreateThread(NULL, 0, KeyHookThreadProc, NULL, CREATE_SUSPENDED, NULL);//键盘锁
-			mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);//键盘锁
+			mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);//鼠标锁
 			SetTimer(hwnd, 1, 1000, NULL); //检测鼠标左上角
-			SetTimer(hwnd, 2, 2000, NULL); //检测极域状态
-			RegisterHotKey(hwnd, 0, MOD_ALT, 0x43); //Alt+C强制结束当前程序
-			RegisterHotKey(hwnd, 1, MOD_ALT, 0x57); //Alt+W最小化顶层窗口
-			RegisterHotKey(hwnd, 2, MOD_ALT, 0x42); //Alt+B显示此窗口
+			SetTimer(hwnd, 2, 2000, NULL); //检测极域状态、更新标题
+			RegisterHotKey(hwnd, 0, MOD_ALT, 'C'); //Alt+C强制结束当前程序
+			RegisterHotKey(hwnd, 1, MOD_ALT, 'W'); //Alt+W最小化顶层窗口
+			if(!RegisterHotKey(hwnd, 2, MOD_ALT, 'B')) //Alt+B显示此窗口
+				if(MessageBox(hwnd, "注册系统级热键 Alt+B 失败，有可能该应用的另一实例还在运行，请先关闭它再重新启动本程序！若“取消”则阻止程序继续启动", "极 域 工 具 包", MB_OKCANCEL | MB_ICONWARNING)==IDCANCEL){
+					PostQuitMessage(0);
+					return FALSE;
+				}
 			HINSTANCE hi = ((LPCREATESTRUCT) lParam)->hInstance;
 			TxLnk = CreateWindow("SysLink", TEXT("极域工具包 <a href=\"https://blog.csdn.net/weixin_42112038?type=blog\">博客</a>"), WS_CHILD | WS_VISIBLE | WS_TABSTOP, 8, 8, 120, 20, hwnd, HMENU(1001), hi, NULL);
 			BtAbt = CreateWindow(WC_BUTTON, TEXT("关于/帮助"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 166, 3, 90, 30, hwnd, HMENU(1002), hi, NULL);
 			//获取密码
-			char str[MAX_PATH] = {};
+			char str[BUFSIZ] = {};
 			LPCSTR psd;
-			if (GetMythwarePasswordFromRegedit(str) == FALSE) {
+			if (!GetMythwarePasswordFromRegedit(str))
 				psd = TEXT("获取密码失败");
-			} else {
-				psd = TEXT(str);
-			}
+			else psd = TEXT(str);
 			CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, psd, WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_READONLY, 8, 36, 248, 20, hwnd, HMENU(1003), hi, NULL);
 			CreateWindow(WC_BUTTON, TEXT("杀掉学生机房管理助手"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,  8, 64, 248, 50, hwnd, HMENU(1013), hi, NULL);
 			BtKmw = CreateWindow(WC_BUTTON, TEXT("杀掉极域"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_SPLITBUTTON, 8, 122, 248, 50, hwnd, HMENU(1004), hi, NULL);
 			TxOut = CreateWindow(STATUSCLASSNAME, TEXT("等待操作"), WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, hwnd, HMENU(1005), hi, NULL);
 			int pts[2] = {352, -1};
 			SendMessage(TxOut, SB_SETPARTS, WPARAM(2), LPARAM(pts));
-			CreateWindow(WC_BUTTON, TEXT("解除禁用工具"), WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 264, 8, 248, 174, hwnd, NULL, hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("解除cmd限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 28, 112, 30, hwnd, HMENU(1007), hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("解禁注册表编辑器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 28, 112, 30, hwnd, HMENU(1008), hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("解禁任务管理器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 66, 112, 30, hwnd, HMENU(1009), hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("解禁Win+R运行"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 66, 112, 30, hwnd, HMENU(1010), hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("解禁taskkill"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 104, 112, 30, hwnd, HMENU(1011), hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("重启资源管理器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 104, 112, 30, hwnd, HMENU(1012), hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("解除助手USB限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 142, 112, 30, hwnd, HMENU(1014), hi, NULL);
-			CreateWindow(WC_BUTTON, TEXT("解禁注销账户"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 142, 112, 30, hwnd, HMENU(1015), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("解除禁用工具"), WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 264, 8, 248, 98, hwnd, NULL, hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("一键解禁系统程序"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 28, 112, 30, hwnd, HMENU(1007), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("解除网络限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 66, 112, 30, hwnd, HMENU(1008), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("解除极域U盘限制"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 66, 112, 30, hwnd, HMENU(1009), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("重启资源管理器"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 28, 112, 30, hwnd, HMENU(1010), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("广播窗口化"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | WS_DISABLED, 264, 112, 120, 30, hwnd, HMENU(1014), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("重置助手密码(&P)"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 112, 120, 30, hwnd, HMENU(1015), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("MeltdownDFC"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 264, 150, 120, 22, hwnd, HMENU(1019), hi, NULL);
+			CreateWindow(WC_BUTTON, TEXT("crdisk"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 150, 120, 22, hwnd, HMENU(1020), hi, NULL);
+			
+			BtWnd = CreateWindow(WC_BUTTON, TEXT("启用鼠标监测弹窗"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 385, 176, 130, 18, hwnd, HMENU(1012), hi, NULL);
+			BtSnp = CreateWindow(WC_BUTTON, TEXT("防止截屏"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX | (IsWindows7OrGreater() ? 0 : WS_DISABLED), 309, 176, 65, 18, hwnd, HMENU(1011), hi, NULL);
+			SendMessage(BtSnp, BM_SETCHECK, BST_CHECKED, NULL);
+			SendMessage(hwnd, WM_COMMAND, 1011, 0);
 			BtTop = CreateWindow(WC_BUTTON, TEXT("置顶此窗口"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 8, 176, 77, 18, hwnd, HMENU(1016), hi, NULL);
 			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, NULL);
-			BtCur = CreateWindow(WC_BUTTON, TEXT("解除鼠标限制(&M)"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 90, 176, 87, 18, hwnd, HMENU(1017), hi, NULL);
-			BtKbh = CreateWindow(WC_BUTTON, TEXT("解键盘锁(&C)"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 183, 176, 65, 18, hwnd, HMENU(1018), hi, NULL);
-			EnumChildWindows(hwnd, SetWindowFont, (LPARAM)0);
-			hMenu = CreatePopupMenu();//托盘菜单
-			AppendMenu(hMenu, MF_STRING, 1, TEXT("关闭程序"));
-			AppendMenu(hMenu, MF_STRING, 2, TEXT("打开界面"));
+			BtCur = CreateWindow(WC_BUTTON, TEXT("解除鼠标限制(&M)"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 95, 176, 107, 18, hwnd, HMENU(1017), hi, NULL);
+			BtKbh = CreateWindow(WC_BUTTON, TEXT("解键盘锁(&C)"), WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 213, 176, 85, 18, hwnd, HMENU(1018), hi, NULL);
+			HFONT hFont = NULL;
+			NONCLIENTMETRICS info;
+			info.cbSize = sizeof(NONCLIENTMETRICS);
+			if (SystemParametersInfo (SPI_GETNONCLIENTMETRICS, 0, &info, 0)) {
+				hFont = CreateFontIndirect ((LOGFONT*)&info.lfMessageFont);
+			}//取系统默认字体
+			EnumChildWindows(hwnd, SetWindowFont, LPARAM(hFont));
 			SetupTrayIcon(hwnd, hi);
 			HMENU sys = GetSystemMenu(hwnd, FALSE);//系统菜单
-			AppendMenu(sys, MF_STRING, 1, TEXT("重置助手密码(&P)"));
+			//AppendMenu(sys, MF_STRING, 1, TEXT("重置助手密码(&P)"));
 			AppendMenu(sys, MF_STRING, 2, TEXT("显示上一个错误(&E)"));
+			AppendMenu(sys, MF_STRING, 4, TEXT("显示程序日志(&L)"));
 			AppendMenu(sys, MF_STRING, 3, TEXT("启动任务管理器(&T)"));
 			focus = GetDlgItem(hwnd, 1013);
 			SetFocus(focus);
 			SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
-			//卸载极域64位进程终止hook
-			HMODULE hook = GetModuleHandle("LibTDProcHook64.dll");
+			//卸载极域进程终止hook
+			HMODULE hook = NULL;
+			if (sizeof(PVOID) == 8)hook = GetModuleHandle("LibTDProcHook64.dll");
+			else hook = GetModuleHandle("LibTDProcHook32.dll");
 			if (hook)FreeModule(hook);
 			break;
 		}
@@ -125,27 +158,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 							Sleep(30);
 							SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
 						} else {
+							ge;
 							SetWindowText(TxOut, "执行失败");
 						}
 					} else { //降权启动极域
 						HKEY retKey;//先读取极域路径
-						std::string data;
+						char szPath[MAX_PATH * 2];
 						LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\TopDomain\\e-Learning Class Standard\\1.00", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
 						if (ret != ERROR_SUCCESS) {
-							SetWindowText(TxOut, "读取路径失败");
-							RegCloseKey(retKey);
-							break;
-						}
-						if (ret != ERROR_SUCCESS) {
+							ge;
 							SetWindowText(TxOut, "读取路径失败");
 							RegCloseKey(retKey);
 							break;
 						}
 						DWORD dataLong = MAX_PATH * 2, type = REG_SZ;
-						ret = RegQueryValueEx(retKey, "TargetDirectory", 0, &type, LPBYTE(data.data()), &dataLong);
+						ret = RegQueryValueEx(retKey, "TargetDirectory", 0, &type, LPBYTE(szPath), &dataLong);
 						RegCloseKey(retKey);
 
 						if (ret != ERROR_SUCCESS) {
+							ge;
 							SetWindowText(TxOut, "读取路径失败");
 							break;
 						}
@@ -160,18 +191,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						HANDLE token;
 						OpenProcessToken(handle, TOKEN_DUPLICATE, &token);//取得token
 						DuplicateTokenEx(token, MAXIMUM_ALLOWED, NULL, SecurityIdentification, TokenPrimary, &token);
-						STARTUPINFO si;//必要的一些参数......
-						PROCESS_INFORMATION pi;
-						ZeroMemory(&si, sizeof(STARTUPINFO));
+						STARTUPINFO si = {};//必要的一些参数......
+						PROCESS_INFORMATION pi = {};
 						si.cb = sizeof(STARTUPINFO);
-						si.lpDesktop = TEXT("winsta0\\default");
-						BOOL bResult = CreateProcessAsUser(token, strcat(data.data(), MythwareFilename), NULL, NULL, NULL,
+						si.dwFlags = STARTF_USESHOWWINDOW;
+						si.wShowWindow = SW_SHOW;
+						BOOL bResult = CreateProcessAsUser(token, strcat(szPath, MythwareFilename), NULL, NULL, NULL,
 						                                   FALSE, CREATE_NEW_PROCESS_GROUP | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi); //启动极域
 						if (bResult) {
 							SetWindowText(TxOut, "启动成功");
 							CloseHandle(pi.hProcess);
 							CloseHandle(pi.hThread);
-						} else SetWindowText(TxOut, "启动失败");
+						} else {
+							ge;
+							SetWindowText(TxOut, "启动失败");
+						}
+
 						CloseHandle(handle);
 						CloseHandle(token);
 						SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
@@ -179,108 +214,164 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 1007: {
+					BYTE cStatus = NO_ERROR;
+
 					//HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows\System:DisableCMD->0
 					HKEY retKey;
 					DWORD value = 0;
-					LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Policies\\Microsoft\\Windows\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					ret = RegSetValueEx(retKey, "DisableCMD", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Policies\\Microsoft\\Windows\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					LONG ret = RegSetValueEx(retKey, "DisableCMD", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁cmd失败", ret);
+						cStatus = 1;
+					} else Println("解禁cmd成功");
 					RegCloseKey(retKey);
 
+					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableRegistryTools->0
+					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegSetValueEx(retKey, "DisableRegistryTools", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
 					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						break;
-					}
-					SetWindowText(TxOut, "设置成功");
+						PrtError("解禁注册表编辑器失败", ret);
+						cStatus = 1;
+					} else Println("解禁注册表编辑器成功");
 
+					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableTaskMgr->0
+					ret = RegSetValueEx(retKey, "DisableTaskMgr", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁任务管理器失败", ret);
+						cStatus = 1;
+					} else Println("解禁任务管理器成功");
+					RegCloseKey(retKey);
+
+					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:NoRun->0
+					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegSetValueEx(retKey, "NoRun", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁Win+R运行失败", ret);
+						cStatus = 1;
+					} else Println("解禁Win+R运行成功，重启资源管理器即可生效");
+
+					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:RestrictRun->0
+					ret = RegSetValueEx(retKey, "RestrictRun", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));//也有作用
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解除程序运行限制失败", ret);
+						cStatus = 1;
+					} else Println("解除程序运行限制成功，重启资源管理器即可生效");
+					RegCloseKey(retKey);
+
+					//HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\taskkill.exe:debugger:(
+					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\taskkill.exe", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegDeleteValue(retKey, "debugger");
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁taskkill失败", ret);
+						//cStatus = 1;
+					} else Println("解禁taskkill成功");
+
+					//HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\ntsd.exe:debugger:(
+					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\ntsd.exe", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegDeleteValue(retKey, "debugger");
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁ntsd失败", ret);
+						//cStatus = 1;
+					} else Println("解禁ntsd成功");
+
+					RegCloseKey(retKey);
+					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:NoLogOff->0
+					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:StartMenuLogOff->0
+					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableLockWorkstation->0
+					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegSetValueEx(retKey, "NoLogOff", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁注销栏失败", ret);
+						cStatus = 1;
+					} else Println("解禁注销栏成功");
+
+					ret = RegSetValueEx(retKey, "StartMenuLogOff", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁开始菜单注销失败", ret);
+						cStatus = 1;
+					} else Println("解禁开始菜单注销成功");
+					RegCloseKey(retKey);
+
+					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegSetValueEx(retKey, "DisableLockWorkstation", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁锁定失败", ret);
+						cStatus = 1;
+					} else Println("解禁锁定成功");
+					RegCloseKey(retKey);
+
+					if (cStatus == NO_ERROR)SetWindowText(TxOut, "设置成功");
+					else SetWindowText(TxOut, "设置部分失败。。");
 					break;
 				}
 				case 1008: {
-					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableRegistryTools->0
-					HKEY retKey;
-					DWORD value = 0;
-					LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						RegCloseKey(retKey);
-						break;
-					}
-					ret = RegSetValueEx(retKey, "DisableRegistryTools", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-					RegCloseKey(retKey);
-
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						break;
-					}
-					SetWindowText(TxOut, "设置成功");
+					//TODO: 检验多种状况
+					//发送终止指令
+					HANDLE hNetFilter = CreateFileW(L"\\\\.\\tdnetfilter", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+					if(hNetFilter > (HANDLE)0){
+						DeviceIoControl(hNetFilter, 0x120014u, NULL, 0, NULL, 0, NULL, 0);
+						PrtError("解除网络限制：发送终止指令 ", NULL);
+						CloseHandle(hNetFilter);
+					} else PrtError("解除网络限制：发送终止指令 ", NULL);
+					//双保险法杀掉网关服务及其守护进程
+					bool bStateM = KillProcess(GetProcessIDFromName("MasterHelper.exe"),KILL_DEFAULT);
+					bool bStateG = KillProcess(GetProcessIDFromName("GATESRV.exe"),KILL_DEFAULT);
+					KillProcess(GetProcessIDFromName("MasterHelper.exe"),KILL_FORCE);
+					KillProcess(GetProcessIDFromName("GATESRV.exe"),KILL_FORCE);
+					Println(strcat("解除网络限制：停止相关进程", (bStateM && bStateG) ? "成功" : "失败"));
+					//停止网络过滤驱动
+					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+					SC_HANDLE hFilt = OpenService(sc, "TDNetFilter", SERVICE_STOP | DELETE);
+					SERVICE_STATUS ss = {};
+					bStateM = ControlService(hFilt, SERVICE_CONTROL_STOP, &ss);
+					DeleteService(hFilt);
+					ge;
+					CloseServiceHandle(sc);
+					CloseServiceHandle(hFilt);
+					Println(strcat("解除网络限制：停止限网驱动", bStateM ? "成功" : "失败"));
+					SetWindowText(TxOut, "设置完成");
 					break;
 				}
 				case 1009: {
-					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableTaskMgr->0
-					HKEY retKey;
-					DWORD value = 0;
-					LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						RegCloseKey(retKey);
-						break;
+					HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
+					int id = MessageBox(hwnd, "请选择关闭USB锁的模式！\n软解禁：向过滤端口发送停止请求\n硬解禁：直接删除过滤驱动，软解禁方案无效时使用！", "USB Setting", MB_YESNOCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND);
+					UnhookWindowsHookEx(hCBTHook);
+					if (id == IDYES) {//LibTDUsbHook10.dll
+						//连接过滤端口（TDUsbFilterInit）
+						HANDLE hPort;
+						HRESULT hResult = FilterConnectCommunicationPort(L"\\TDFileFilterPort", 0, NULL, 0, NULL, &hPort);
+						if(hResult){
+							error = hResult & 0x0000FFFF;
+							SetWindowText(TxOut, "设置失败");
+							break;
+						}
+						//发送消息（TDUsbFiltFree）
+						int lpInBuffer[4] = {8, 0, 0, 0}; // [esp+0h] [ebp-10h] BYREF
+						//memset(&lpInBuffer[1], 0, 12);
+						//lpInBuffer[0] = 8;
+						hResult = FilterSendMessage(hPort, lpInBuffer, 16/*0x10u*/, NULL, 0, NULL);
+						ge;
+						//关闭句柄（TDUsbFilterDone）
+						CloseHandle(hPort);
+						SetWindowText(TxOut, !hResult ? "设置完成" : "设置失败");
+					} else if (id == IDNO) {
+						SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+						SC_HANDLE hFilt = OpenService(sc, "TDFileFilter", SERVICE_STOP | DELETE);
+						SERVICE_STATUS ss = {};
+						if(ControlService(hFilt, SERVICE_CONTROL_STOP, &ss))
+							SetWindowText(TxOut, "设置成功");
+						else{
+							ge;
+							SetWindowText(TxOut, "设置失败");
+						}
+						DeleteService(hFilt);
+						CloseServiceHandle(sc);
+						CloseServiceHandle(hFilt);
 					}
-					ret = RegSetValueEx(retKey, "DisableTaskMgr", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-					RegCloseKey(retKey);
-
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						break;
-					}
-					SetWindowText(TxOut, "设置成功");
 					break;
 				}
 				case 1010: {
-					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:NoRun->0
-					HKEY retKey;
-					DWORD value = 0;
-					LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						RegCloseKey(retKey);
-						break;
-					}
-					ret = RegSetValueEx(retKey, "NoRun", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-					ret = RegSetValueEx(retKey, "RestrictRun", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));//也有作用
-					RegCloseKey(retKey);
-
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						break;
-					}
-					SetWindowText(TxOut, "设置成功，重启资源管理器即可生效");
-					break;
-				}
-				case 1011: {
-					//HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\taskkill.exe:debugger:(
-					HKEY retKey;
-					LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\taskkill.exe", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						RegCloseKey(retKey);
-						break;
-					}
-					RegDeleteValue(retKey, "debugger");
-					RegCloseKey(retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						break;
-					}
-					SetWindowText(TxOut, "设置成功");
-					break;
-				}
-				case 1012: {
-					/*if (KillProcess(GetProcessIDFromName("explorer.exe") ) == FALSE) {
-						SetWindowText(TxOut, "执行失败");
-						break;
-					}
-					Sleep(200);
-					//打开资源管理器
-					WinExec("start explorer.exe", SW_HIDE);*/
 					HWND hwnd = FindWindow("Shell_TrayWnd", NULL);//有这个类名的窗口一定隶属于explorer.exe
 					DWORD pid;
 					GetWindowThreadProcessId(hwnd, &pid);//反查出窗口PID
@@ -292,44 +383,52 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
 					if (TerminateProcess(handle, 2))//退出码为2
 						SetWindowText(TxOut, "执行成功");
-					else
+					else {
+						ge;
 						SetWindowText(TxOut, "执行失败");
+					}
 					CloseHandle(handle);
 					break;
 				}
 				case 1013: {
-					char version[6];//考虑极端值如6.9.5
+					char version[6] = {};//考虑极端值如6.9.5
 					HKEY retKey;
 					LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\ZM软件工作室\\学生机房管理助手", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
 					DWORD size = sizeof(version);
 					RegQueryValueEx(retKey, "Version", NULL, NULL, (LPBYTE)&version, &size);
 					RegCloseKey(retKey);
 					if (ret != ERROR_SUCCESS) {
+						ge;
 						SetWindowText(TxOut, "执行失败，可能未安装学生机房管理助手");
 						break;
 					}
+					std::string sLog = "机房助手版本：";
+					sLog += version;
+					sLog += "\nprozs.exe进程名：";
 					//取时间用于计算prozs.exe的随机进程名
 					SYSTEMTIME time;
 					GetLocalTime(&time);
 					int n3 = time.wMonth + time.wDay;
 					int n4, n5, n6;
 					DWORD prozsPid;
-					if (version[0] == '7' && version[2] == '5') {
-						//以下为7.5版本逻辑
+					if (version[0] == '7' &&(version[2] == '5' || version[2] == '8')) {
+						//以下为7.5、7.8版本逻辑
 						PROCESSENTRY32 pe;
 						pe.dwSize = sizeof(PROCESSENTRY32);
 						HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 						if (Process32First(hSnapshot, &pe)) {
 							do {
-								//筛选长度为10的进程名（不包含末尾“.exe”）
-								if (strlen(pe.szExeFile) == 14) {
+								//筛选长度为10（7.5）或大于等于4（7.8）的进程名（不包含末尾“.exe”）
+								size_t uImageLength = strlen(pe.szExeFile);
+								if ((version[2] == '5')?(uImageLength == 14):(uImageLength >= 8)) {
 									//遍历字符
-									for (int j = 0; j < 10; j++) {
+									for (size_t j = 0; ((version[2] == '5')?(j < 10):(j < uImageLength - 4)); j++) {
 										char n7 = pe.szExeFile[j];
 										//符不符合d-m之间
 										if (!(n7 >= 100 && n7 <= 109))goto IL_226;
 									}
 									//就是你！
+									sLog += pe.szExeFile;
 									prozsPid = pe.th32ProcessID;
 									break;
 								}
@@ -349,6 +448,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 							c1 = 98 + n,  c2 = 65 + n4,  c3 = 108 + n5,  c4 = 75 + n6;
 						}
 						char c[5] = {c1, c2, c3, c4, '\0'};
+						sLog += c;
 						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
 					} else if (version[0] == '7' && version[2] == '2') {
 						char c1, c2, c3, c4;
@@ -360,17 +460,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 							c1 = 97 + n4,   c2 = 109 + n5,  c3 = 101 + n6,  c4 = 48 + n5;
 						}
 						char c[5] = {c1, c2, c3, c4, '\0'};
+						sLog += c;
 						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
 					} else {
 						//以下为7.2版本之前的逻辑
 						n4 = n3 % 3 + 3, n5 = n3 % 4 + 4;
 						char c[4] = {'p'};
 						if (n3 % 2 != 0)
-							c[1] = n4 + 102, c[2] = n5 + 98;
+							c[1] = n5 + 102, c[2] = n4 + 98;
 						else
 							c[1] = n4 + 99,  c[2] = n5 + 106;
+						sLog += c;
 						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
 					}
+					Println(sLog);
 					KillProcess(prozsPid, KILL_DEFAULT);
 					KillProcess(GetProcessIDFromName("jfglzs.exe"), KILL_DEFAULT);
 					//停止zmserv服务防止关机
@@ -383,44 +486,55 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					SetWindowText(TxOut, "执行成功");
 					break;
 				}
-				case 1014: {
-					//HKEY_LOCAL_MACHINE\SOFTWARE\jfglzs:usb_jianche->off
-					//这个注册表的“检测”还打错了
-					char c[4] = "off";
-					HKEY retKey;
-					LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\jfglzs", 0, KEY_SET_VALUE, &retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						RegCloseKey(retKey);
-						break;
+				case 1011: {
+					LRESULT check = SendMessage(BtSnp, BM_GETCHECK, NULL, NULL);
+					if (check == BST_CHECKED) {
+						SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+					} else {
+						SetWindowDisplayAffinity(hwnd, WDA_NONE);
 					}
-					ret = RegSetValueEx(retKey, "usb_jianche", 0, REG_SZ, (CONST BYTE*)&c, 4);
-					SetWindowText(TxOut, "设置成功");
-					RegCloseKey(retKey);
 					break;
 				}
-				case 1015: {
-					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:NoLogOff->0
-					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:StartMenuLogOff->0
-					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableLockWorkstation->0
-					HKEY retKey;
-					DWORD value = 0;
-					LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
+				case 1012: {
+					LRESULT check = SendMessage(BtWnd, BM_GETCHECK, NULL, NULL);
+					ask = (check == BST_CHECKED) ? true : false;
+					break;
+				}
+				case 1014: {
+					//找到工具条
+					HWND menuBar = FindWindowEx(hBdCst, NULL, "AfxWnd80u", NULL);
+					/*//显示工具条
+					  ShowWindow(menuBar, SW_SHOWDEFAULT);
+					  SetWindowPos(menuBar, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+					  //隐藏工具条
+					  ShowWindow(menuBar, SW_NORMAL);
+					  SetWindowPos(menuBar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);*/
+					//解禁全屏按钮
+					//EnableWindow(GetDlgItem(menuBar, 1004),FALSE);
+					//模拟点击
+					BOOL bWindowing;
+					LONG lStyle = GetWindowLong(hBdCst, GWL_STYLE);
+					if (lStyle & WS_SYSMENU)bWindowing = TRUE;
+					PostMessage(hBdCst, WM_COMMAND, MAKEWPARAM(1004, BM_CLICK), NULL);
+					SetWindowText(TxOut, bWindowing ? "全屏化完成" : "窗口化完成");
+					SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
+					break;
+				}
+				case 1015 :{
+					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-7.8版本有效，该操作不可逆！！", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
+						std::string c = "8a29cc29f5951530ac69f4";
+						HKEY retKey;
+						LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software", 0, KEY_SET_VALUE, &retKey);
+						if (ret != ERROR_SUCCESS) {
+							ge;
+							SetWindowText(TxOut, "设置失败");
+							RegCloseKey(retKey);
+							break;
+						}
+						ret = RegSetValueEx(retKey, "n", 0, REG_SZ, (CONST BYTE*)c.c_str(), c.size() + 1);
+						SetWindowText(TxOut, "设置成功");
 						RegCloseKey(retKey);
-						break;
 					}
-					ret = RegSetValueEx(retKey, "NoLogOff", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-					ret = RegSetValueEx(retKey, "StartMenuLogOff", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-					ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					ret = RegSetValueEx(retKey, "DisableLockWorkstation", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-					RegCloseKey(retKey);
-					if (ret != ERROR_SUCCESS) {
-						SetWindowText(TxOut, "设置失败");
-						break;
-					}
-					SetWindowText(TxOut, "设置成功");
 					break;
 				}
 				case 1016: {
@@ -447,13 +561,84 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					LRESULT check = SendMessage(BtKbh, BM_GETCHECK, NULL, NULL);
 					if (check == BST_CHECKED) {
 						ResumeThread(keyHook);
+						//打开符号链接
+						HANDLE hDevice = CreateFile("\\\\.\\TDKeybd", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+						if (GetLastError()) {
+							PrtError(GetLastError() == ERROR_FILE_NOT_FOUND ? "解驱动键盘锁：驱动未安装" : "解驱动键盘锁：设置失败", GetLastError());
+							break;
+						}
+						BOOL bEnable = TRUE;
+						//发送控制代码
+						if (DeviceIoControl(hDevice, 0x220000u, &bEnable, 4, NULL, 0, NULL, NULL)){
+							Print("解驱动键盘锁：设置成功");
+						} else {
+							PrtError("解驱动键盘锁：设置失败",GetLastError());
+						}
+						CloseHandle(hDevice);
 					} else {
 						SuspendThread(keyHook);
 						UnhookWindowsHookEx(kbdHook);
 					}
 					break;
 				}
-
+				case 1019: {
+					//判断是否已在运行
+					DWORD dwPID = GetProcessIDFromName("MeltdownDFC.exe");
+					if(dwPID) break;
+					//取缓存路径，创建文件
+					char szTempPath[MAX_PATH];
+					GetTempPath(MAX_PATH, szTempPath);
+					HANDLE hFile = CreateFile(strcat(szTempPath, "\\MeltdownDFC.exe"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+					if(hFile != INVALID_HANDLE_VALUE){
+						//获取资源信息
+						HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(2), RT_RCDATA);
+						HGLOBAL hResData = LoadResource(NULL, hResInfo);
+						DWORD dwSize = SizeofResource(NULL, hResInfo);
+						LPVOID pData = LockResource(hResData);
+						if(pData){
+							//写入文件
+							if(!WriteFile(hFile, pData, dwSize + 1, NULL, NULL)){
+								SetWindowText(TxOut, "写入失败");
+								CloseHandle(hFile);
+								break;
+							}
+							FlushFileBuffers(hFile);
+							CloseHandle(hFile);
+							//执行程序
+							if(WinExec(szTempPath, SW_SHOW) < 32)
+								SetWindowText(TxOut, "启动失败");
+							else SetWindowText(TxOut, "启动完成");
+						} else SetWindowText(TxOut, "写入失败");
+					} else SetWindowText(TxOut, "启动失败");
+					break;
+				}
+				case 1020: {
+					//同上
+					DWORD dwPID = GetProcessIDFromName("crdisk.exe");
+					if(dwPID) break;
+					char szTempPath[MAX_PATH];
+					GetTempPath(MAX_PATH, szTempPath);
+					HANDLE hFile = CreateFile(strcat(szTempPath, "\\crdisk.exe"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+					if(hFile != INVALID_HANDLE_VALUE){
+						HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(3), RT_RCDATA);
+						HGLOBAL hResData = LoadResource(NULL, hResInfo);
+						DWORD dwSize = SizeofResource(NULL, hResInfo);
+						LPVOID pData = LockResource(hResData);
+						if(pData){
+							if(!WriteFile(hFile, pData, dwSize + 1, NULL, NULL)){
+								SetWindowText(TxOut, "写入失败");
+								CloseHandle(hFile);
+								break;
+							}
+							FlushFileBuffers(hFile);
+							CloseHandle(hFile);
+							if(WinExec(szTempPath, SW_SHOW) < 32)
+								SetWindowText(TxOut, "启动失败");
+							else SetWindowText(TxOut, "启动完成");
+						} else SetWindowText(TxOut, "写入失败");
+					} else SetWindowText(TxOut, "启动失败");
+					break;
+				}
 			}
 			return 0;
 		}
@@ -466,6 +651,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						HWND topHwnd = GetForegroundWindow();
 						DWORD pid;
 						GetWindowThreadProcessId(topHwnd, &pid);
+						if(pid != GetCurrentProcessId())//避免焦点在当前程序时，关闭自己
 						KillProcess(pid, KILL_FORCE);
 					} else { //第一次
 						closingProcess = true;
@@ -474,26 +660,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				case 1: { //Alt+W
 					HWND topHwnd = GetForegroundWindow();
-					ShowWindow(topHwnd, SW_MINIMIZE);
+					if(!IsHungAppWindow(topHwnd))//应用程序无响应时不作处理。防止使自己堵塞，导致无响应。TODO: 此函数可能即将弃用，等待更好解决方法
+						ShowWindow(topHwnd, SW_MINIMIZE);
 					break;
 				}
 				case 2://Alt+B
 					ShowWindow(hwnd, SW_SHOWNORMAL);
 					SetForegroundWindow(hwnd);
 			}
-
 			return 0;
 		case WM_TIMER:
 			switch (wParam) {
 				case 1:
-					if (!asking) {
+					if (!asking && ask) {
 						//检测鼠标左上角事件
 						GetCursorPos(&p);
 						if (p.x == 0 && p.y == 0) {
 							asking = true;
 							HWND topHwnd = GetForegroundWindow();
 							if (MessageBox(hwnd, "检测到了鼠标位置变化！是否最小化焦点窗口？", "实时监测", MB_YESNO | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST) == IDYES) {
-								ShowWindow(topHwnd, SW_MINIMIZE);
+								if(!IsHungAppWindow(topHwnd))//同上
+									ShowWindow(topHwnd, SW_MINIMIZE);
 							}
 							asking = false;
 						} else if (p.x == w && p.y == 0) {
@@ -509,7 +696,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 								HWND hParent = CreateWindowEx(0, WC_STATIC, "", 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL);
 								//将目标窗口设为子窗口
 								SetParent(topHwnd, hParent);
-								error = GetLastError();
+								ge;
 								//关闭父窗口，子窗口也将一并销毁
 								PostMessage(hParent, WM_CLOSE, 0, 0);
 							}
@@ -519,7 +706,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					}
 				case 2: {
 					std::string title = RandomWindowTitle();
-					SetWindowText(hwnd,title.c_str());
+					SetWindowText(hwnd, title.c_str());
 					DWORD id = GetProcessIDFromName(MythwareFilename);
 					if (id == 0) {
 						SendMessage(TxOut, SB_SETTEXT, 1, LPARAM("极域未运行"));
@@ -534,6 +721,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						sprintf(show.data(), "%s[PID:%d]", show.c_str(), int(id));
 						SendMessage(TxOut, SB_SETTEXT, 1, LPARAM(show.c_str()));
 						SetWindowText(BtKmw, "杀掉极域");
+						//判断广播状态
+						HWND* bdCst = new HWND;
+						*bdCst = NULL;
+						BOOL bWindowing = FALSE;
+						EnumWindows(EnumWindowsProc, LPARAM(bdCst));
+						if (*bdCst) {
+							LONG lStyle = GetWindowLong(*bdCst, GWL_STYLE);
+							if (lStyle & WS_SYSMENU)bWindowing = TRUE;
+						}
+						hBdCst = *bdCst;
+						EnableWindow(GetDlgItem(hwnd, 1014), *bdCst ? TRUE : FALSE);
+						SetDlgItemText(hwnd, 1014, bWindowing ? "广播全屏化" : "广播窗口化");
 					}
 					break;
 				}
@@ -586,6 +785,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			} else if (lParam == WM_RBUTTONUP) { //右键单击
 				GetCursorPos(&pt);
 				SetForegroundWindow(hwnd);
+				HMENU hMenu = CreatePopupMenu();//托盘菜单
+				AppendMenu(hMenu, MF_STRING, 1, TEXT("关闭程序"));
+				AppendMenu(hMenu, MF_STRING, 2, TEXT("打开界面"));
 				int i = TrackPopupMenu(hMenu, TPM_RETURNCMD, pt.x, pt.y, NULL, hwnd, NULL);
 				switch (i) {
 					case 1:
@@ -604,12 +806,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				case BCN_DROPDOWN: {
 					NMBCDROPDOWN* pDropDown = (NMBCDROPDOWN*)lParam;
 					if (pDropDown->hdr.hwndFrom == BtKmw) {
-						HWND bdCst = FindWindow(NULL, "屏幕广播");
-						BOOL bWindowing = FALSE;
-						if (bdCst) {
-							LONG lStyle = GetWindowLong(bdCst, GWL_STYLE);
-							if (lStyle & WS_SYSMENU)bWindowing = TRUE;
-						}
 						// Get screen coordinates of the button.
 						POINT pt;
 						pt.x = pDropDown->rcButton.left;
@@ -622,8 +818,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						else if (mwSts == 1)show = "恢复极域";
 						AppendMenu(hSplitMenu, MF_BYPOSITION, 1, show);
 						EnableMenuItem(hSplitMenu, 1, mwSts != 2 ? MF_ENABLED : MF_GRAYED);
-						AppendMenu(hSplitMenu, MF_BYPOSITION, 2, bWindowing ? "广播全屏化" : "广播窗口化");
-						EnableMenuItem(hSplitMenu, 2, bdCst ? MF_ENABLED : MF_GRAYED);
 						// Display the menu.
 						SuspendThread(thread);
 						int i = TrackPopupMenu(hSplitMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, pt.x, pt.y, 0, hwnd, NULL);
@@ -636,37 +830,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 								SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
 								break;
 							}
-							case 2: {
-								/*//获取广播窗口句柄
-								HWND bdCst = FindWindow(NULL, "屏幕广播");
-								if (!bdCst) {
-									SetWindowText(TxOut, "未找到广播窗口");
-									break;
-								  }*/
-								//找到工具条
-								HWND menuBar = FindWindowEx(bdCst, NULL, "AfxWnd80u", NULL);
-								//显示工具条
-								/*ShowWindow(menuBar, SW_SHOWDEFAULT);
-								SetWindowPos(menuBar, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);*/
-								//解禁全屏按钮
-								//EnableWindow(GetDlgItem(menuBar, 1004),FALSE);
-								//模拟点击
-								PostMessage(bdCst, WM_COMMAND, WPARAM((BM_CLICK << 16) | 1004), NULL);
-								SetWindowText(TxOut, bWindowing ? "全屏化完成" : "窗口化完成");
-								break;
-							}/*
-				case 3: {
-					HWND bdCst = FindWindow(NULL, "屏幕广播");
-					if (!bdCst) {
-						SetWindowText(TxOut, "未找到广播窗口");
-						break;
-					}
-					HWND menuBar = FindWindowEx(bdCst, NULL, "AfxWnd80u", NULL);
-					ShowWindow(menuBar, SW_NORMAL);
-					SetWindowPos(menuBar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
-					SetWindowText(TxOut, "全屏化完成");
-					break;
-				}*/
 						}
 						return TRUE;
 					}
@@ -695,7 +858,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 			}
-
 			break;
 		case WM_LBUTTONDOWN:
 			//实现空白处随意拖动
@@ -703,64 +865,72 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			break;
 		case WM_SYSCOMMAND:
 			switch (wParam) {
-				case 1: {
-					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-7.5版本有效，该操作不可逆！！", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
-						std::string c = "8a29cc29f5951530ac69f4";
-						HKEY retKey;
-						LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software", 0, KEY_SET_VALUE, &retKey);
-						if (ret != ERROR_SUCCESS) {
-							SetWindowText(TxOut, "设置失败");
-							RegCloseKey(retKey);
-							break;
-						}
-						ret = RegSetValueEx(retKey, "n", 0, REG_SZ, (CONST BYTE*)c.c_str(), c.size() + 1);
-						SetWindowText(TxOut, "设置成功");
-						RegCloseKey(retKey);
-						break;
-					}
-				}
 				case 2: {
 					if (error == -1)error = GetLastError();
-					HLOCAL LocalAddress = NULL;
+					LPSTR szError = NULL;
 					FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-					              NULL, error, 0, (PTSTR)&LocalAddress, 0, NULL);
-					LPSTR msg = LPSTR(LocalAddress);
-					std::string s;
-					sprintf(s.data(), "GetLastError上一个错误：\n%u：%s", error, msg);
-					LocalFree(LocalAddress);
-					MessageBox(hwnd, TEXT(s.c_str()), TEXT("上一个错误"), MB_OK | MB_ICONINFORMATION);
+					              NULL, error, 0, (PTSTR)&szError, 0, NULL);
+					char s[BUFSIZ] = {};
+					sprintf(s, "GetLastError上一个错误：\n%u：%s", error, szError);
+					LocalFree(HLOCAL(szError));
+					MessageBox(hwnd, s, "上一个错误", MB_OK | MB_ICONINFORMATION);
 					error = -1;
 					break;
 				}
-				case 3:{
+				case 3: {
 					//判断有没有启动
-					HWND h=FindWindow("TaskManagerWindow", NULL);
-					if(!h){
+					HWND h = FindWindow("TaskManagerWindow", NULL);
+					BYTE nCount = 0;
+					if (!h) {
 						//如果还没有就先启动
 						WinExec("taskmgr", SW_SHOW);
-						do{
+						ge;
+						do {
+							//最多等待5秒，否则停止搜寻，防止无响应
+							if (++nCount == 100) {
+								SetWindowText(TxOut, "启动失败");
+								return FALSE;
+							}
 							//等待窗口创建完成
 							Sleep(50);
-							h=FindWindow("TaskManagerWindow", NULL);
-						}while(!h);
+							h = FindWindow("TaskManagerWindow", NULL);
+						} while (!h);
 					}
 					//获取菜单，取得勾选状态
 					HMENU hm = GetMenu(h);
 					MENUITEMINFO mii = {sizeof(MENUITEMINFO), MIIM_STATE};
 					GetMenuItemInfo(hm, 0x7704, FALSE, &mii);
 					//如果未勾选就模拟勾选
-					if(!(mii.fState & MFS_CHECKED))
+					if (!(mii.fState & MFS_CHECKED))
 						PostMessage(h, WM_COMMAND, 0x7704, 0);
 					SetWindowText(TxOut, "启动完成");
+					break;
 				}
+				case 4: {
+					//获取缓存目录，保存日志
+					char szTempPath[MAX_PATH];
+					GetTempPath(MAX_PATH, szTempPath);
+					HANDLE hFile = CreateFile(strcat(szTempPath, "\\ToolkitLog.txt"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+					WriteFile(hFile, sOutPut.c_str(), sOutPut.size() + 1, NULL, NULL);
+					FlushFileBuffers(hFile);
+					//打开文件句柄
+					ShellExecute(hwnd, "open", szTempPath, NULL, NULL, SW_SHOW);
+					CloseHandle(hFile);
+					break;
+				}
+				case SC_CLOSE:
+					if((GetAsyncKeyState(VK_MENU) & 1)/* && (GetAsyncKeyState(VK_F4) & 1)*/)break;//Alt+F4不最小化，直接关闭
+					PostMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, lParam);//改为最小化
+					return TRUE;
 				case SC_MINIMIZE:
+					SetActiveWindow(hwnd);//TODO: 检查崩溃问题
 					focus = GetFocus();//防止最小化后焦点失效
 			}
 			return DefWindowProc(hwnd, Message, wParam, lParam);
 		case WM_SIZE:
 			if (wParam == SIZE_MINIMIZED) {
 				ShowWindow(hwnd, SW_HIDE); //隐藏
-				break;
+				return TRUE;
 			}
 		/* All other messages (a lot of them) are processed using default procedures */
 		default:
@@ -772,6 +942,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 }
 /* The 'main' function of Win32 GUI programs: this is where execution starts */
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+	//SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
+	SetUnhandledExceptionFilter(GlobalExceptionHandler);
 	//判断是否为系统权限
 	//https://www.cnblogs.com/idebug/p/11124664.html
 	BOOL bIsLocalSystem = FALSE;
@@ -798,20 +970,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		PROCESS_INFORMATION pi;
 		ZeroMemory(&si, sizeof(STARTUPINFOW));
 		si.cb = sizeof(STARTUPINFOW);
-		si.lpDesktop = L"winsta0\\default";
+		GetStartupInfoW(&si);
 		BOOL bResult = CreateProcessWithTokenW(hToken, LOGON_NETCREDENTIALS_ONLY, NULL, GetCommandLineW(), NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
 		error = GetLastError();
 		CloseHandle(hToken);
 		if (bResult)return 0;
-		else MessageBox(0, "无法以系统权限运行本程序，已以普通方式运行。欲了解更多信息，请查看上一个错误。", "启动错误", MB_ICONERROR | MB_OK);
+		else MessageBox(NULL, "无法以系统权限运行本程序，已以普通方式运行。欲了解更多信息，请查看上一个错误。", "启动错误", MB_ICONERROR | MB_OK);
 	}
 	//主程序开始
-	InitCommonControls();
-
 	WNDCLASSEX wc; /* A properties struct of our window */
-
 	MSG msg; /* A temporary location for all messages */
-
 	/* zero out the struct and set the stuff we want to modify */
 	memset(&wc, 0, sizeof(wc));
 	wc.cbSize		 = sizeof(WNDCLASSEX);
@@ -916,13 +1084,13 @@ bool KillProcess(DWORD dwProcessID, int way) {
 		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, dwProcessID);
 
 		if (hSnapshot != INVALID_HANDLE_VALUE) {
-			bool rtn = false;
+			bool rtn = true;
 			THREADENTRY32 te = {sizeof(te)};
 			BOOL fOk = Thread32First(hSnapshot, &te);
 			for (; fOk; fOk = Thread32Next(hSnapshot, &te)) {
 				if (te.th32OwnerProcessID == dwProcessID) {
 					HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te.th32ThreadID);
-					if (TerminateThread(hThread, 0)) rtn = true;
+					if (!TerminateThread(hThread, 0)) rtn = false;
 					CloseHandle(hThread);
 				}
 			}
@@ -948,25 +1116,23 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter) {
 	return 0L;
 }
 
-
 LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
-	//KBDLLHOOKSTRUCT *pkbhs = (KBDLLHOOKSTRUCT *)lParam;
-	//HWND hwnd=GetForegroundWindow();
-	//PostMessage(hwnd, UINT(wParam), WPARAM(pkbhs->vkCode), NULL/*TODO*/);
-	return FALSE;//CallNextHookEx(NULL, nCode, wParam, lParam);
+	return FALSE;
 }
-//https://www.52pojie.cn/thread-542884-1-1.html 有删改
+//https://www.52pojie.cn/thread-542884-1-1.html 有删改 TODO: 尝试FreeModule(libTDMaster.dll)
 DWORD WINAPI KeyHookThreadProc(LPVOID lpParameter) {
+	HMODULE hModule = GetModuleHandle(NULL);
 	while (true) {
-		kbdHook = (HHOOK)SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)HookProc, GetModuleHandle(NULL), 0);
+		kbdHook = (HHOOK)SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)HookProc, hModule, 0);
 		Sleep(25);
 		UnhookWindowsHookEx(kbdHook);
 	}
 	return 0;
 }
 DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter) {
+	HMODULE hModule = GetModuleHandle(NULL);
 	while (true) {
-		mseHook = (HHOOK)SetWindowsHookEx(WH_MOUSE_LL, (HOOKPROC)HookProc, GetModuleHandle(NULL), 0);
+		mseHook = (HHOOK)SetWindowsHookEx(WH_MOUSE_LL, (HOOKPROC)HookProc, hModule, 0);
 		ClipCursor(0);
 		Sleep(25);
 		UnhookWindowsHookEx(mseHook);
@@ -980,18 +1146,32 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam) {
 		char szClass[7];
 		GetClassName(msgHwnd, szClass, 7);
 		if (_stricmp("#32770", szClass) == 0) { //判断传入窗口是否是MessageBox的窗口
-			SetDlgItemText(msgHwnd, IDYES, "关闭");
-			SetDlgItemText(msgHwnd, IDNO, "强制关闭");
-			SetDlgItemText(msgHwnd, IDCANCEL, "取消");
-			HMENU msgMenu = GetSystemMenu(msgHwnd, FALSE);
-			EnableMenuItem(msgMenu, SC_CLOSE, MF_GRAYED);
+			//获取窗口标题
+			int nLength = GetWindowTextLength(msgHwnd);
+			char szName[nLength + 2];
+			GetWindowText(msgHwnd, szName, nLength + 1);
+			if (_stricmp(szName, "实时监测") == 0) {
+				SetDlgItemText(msgHwnd, IDYES, "关闭");
+				SetDlgItemText(msgHwnd, IDNO, "强制关闭");
+				SetDlgItemText(msgHwnd, IDCANCEL, "取消");
+				HMENU msgMenu = GetSystemMenu(msgHwnd, FALSE);
+				EnableMenuItem(msgMenu, SC_CLOSE, MF_GRAYED);
+			} else if (_stricmp(szName, "USB Setting") == 0) {
+				SetDlgItemText(msgHwnd, IDYES, "软解禁");
+				SetDlgItemText(msgHwnd, IDNO, "硬解禁");
+			} else if (_stricmp(szName, "程序出现异常") == 0) {
+				SetDlgItemText(msgHwnd, IDYES, "重启程序");
+				SetDlgItemText(msgHwnd, IDNO, "终止程序");
+				SetDlgItemText(msgHwnd, IDCANCEL, "继续");
+			}
+			
 		}
 	}
 	return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam) {
-	SendMessage(hwndChild, WM_SETFONT, WPARAM(hFont), 0);
+	SendMessage(hwndChild, WM_SETFONT, WPARAM(lParam), 0);
 	return TRUE;
 }
 
@@ -1088,6 +1268,10 @@ int GetProcessState(DWORD dwProcessID) {
 	NTSTATUS lStatus = mNtQuerySystemInformation(SystemProcessInformation, pInfo, dwSize, 0);
 	if (!NT_SUCCESS(lStatus)) {
 		GlobalFree(hBuffer);
+		//NTSTATUS 转 win32 error
+		typedef DWORD (NTAPI *RtlNtStatusToDosErrorNoTeb)(NTSTATUS Status);
+		RtlNtStatusToDosErrorNoTeb mRtlNtStatusToDosErrorNoTeb = RtlNtStatusToDosErrorNoTeb(GetProcAddress(GetModuleHandle("ntdll.dll"), "RtlNtStatusToDosErrorNoTeb"));
+		error = mRtlNtStatusToDosErrorNoTeb(lStatus);
 		return nStatus;
 	}
 	//遍历进程
@@ -1116,6 +1300,29 @@ int GetProcessState(DWORD dwProcessID) {
 	return nStatus;
 }
 
+//屏幕广播标题
+LPCSTR sBdCst[2] = {"屏幕广播", " 正在共享屏幕"};
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
+	//是否是afx类名（极域使用了MFC框架），这样减少很多比较，提高效率的同时又能减少误杀
+	char szClass[5];
+	GetClassName(hwnd, szClass, 5);
+	if (_stricmp(szClass, "Afx:") == 0) {
+		//获取窗口标题
+		int nLength = GetWindowTextLength(hwnd);
+		char szName[nLength + 2];
+		GetWindowText(hwnd, szName, nLength + 1);
+		//比较标题，分别是全文比较和比较末尾
+		if (_stricmp(szName, sBdCst[0]) == 0 ||
+		    _stricmp(szName + nLength - strlen(sBdCst[1]), sBdCst[1]) == 0) {
+			//将目标窗口句柄通过lParam传回调用处
+			HWND* pBdCst = (HWND*) lParam;
+			*pBdCst = hwnd;
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
 bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
 	icon.cbSize = sizeof(NOTIFYICONDATA); // 结构大小
 	icon.hWnd = m_hWnd; // 接收 托盘通知消息 的窗口句柄
@@ -1127,7 +1334,7 @@ bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
 	return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
 }
 
-std::string RandomWindowTitle(){
+std::string RandomWindowTitle() {
 	//随机窗口名
 	std::srand((unsigned) time(NULL));
 	std::string title;
@@ -1138,4 +1345,52 @@ std::string RandomWindowTitle(){
 		else title.push_back(u % 26 + 'A');
 	}
 	return title;
+}
+
+// 定义全局异常处理函数
+LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
+{
+	// 弹出对话框并显示异常内容
+	char message[BUFSIZ * 2] = {};
+	sprintf(message, "异常代码：0x%08X\n程序将%s，如此问题依旧存在，请联系开发者", exceptionInfo->ExceptionRecord->ExceptionCode,
+		(exceptionInfo->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE)?"退出":"尝试继续执行");
+	HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
+	int id = MessageBox(NULL, message, "程序出现异常", MB_ICONERROR | MB_YESNOCANCEL);
+	UnhookWindowsHookEx(hCBTHook);
+	if(id == IDYES){
+		LPSTR szCmd = GetCommandLine();
+		WinExec(szCmd, SW_SHOW);
+		return EXCEPTION_EXECUTE_HANDLER;
+	} else if(id == IDNO){
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+	// 返回处理结果，继续执行程序或退出
+	return (exceptionInfo->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE)?
+		EXCEPTION_EXECUTE_HANDLER:EXCEPTION_CONTINUE_EXECUTION;
+}
+
+inline void PrtError(LPCSTR szDes, LRESULT lResult) {
+	DWORD dwError = lResult == NULL ? GetLastError() : lResult & 0x0000FFFF;
+	LPSTR szError = NULL;
+	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
+	              NULL, dwError, 0, (PTSTR)&szError, 0, NULL);
+	char s[BUFSIZ] = {};
+	sprintf(s, "%s：%u-%s", szDes, dwError, szError);
+	LocalFree(HLOCAL(szError));
+	//过滤末尾换行符
+	if(*(s+strlen(s)-1) == '\n')*(WORD*)(s+strlen(s)-2) = 0;
+	Print(s);
+}
+
+inline LPSTR FormatLogTime(){
+	//申请内存，获得时间
+	LPVOID lpBuffer = VirtualAlloc(NULL, 64, MEM_COMMIT, PAGE_READWRITE);
+	SYSTEMTIME time;
+	GetLocalTime(&time);
+	LPSTR szBuffer = LPSTR(lpBuffer);
+	//格式化
+	sprintf(szBuffer, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] ", 
+		time.wYear, time.wMonth, time.wDay,
+		time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
+	return szBuffer;
 }

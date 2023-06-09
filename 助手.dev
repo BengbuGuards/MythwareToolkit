@@ -11,7 +11,7 @@ ResourceIncludes =
 MakeIncludes = 
 Compiler = 
 CppCompiler = 
-Linker = C:/Windows/System32/comctl32.dll
+Linker = C:/Windows/System32/Comctl32.dll C:/Windows/System32/FltLib.dll
 IsCpp = 1
 Icon = app.ico
 ExeOutput = 
@@ -27,36 +27,40 @@ CommandLine =
 Folders = 
 IncludeVersionInfo = 1
 SupportXPThemes = 0
-CompilerSet = 0
-UnitCount = 4
+CompilerSet = 4
+UnitCount = 6
 UsePrecompiledHeader = 0
 PrecompiledHeader = 
 CompilerSetType = 0
 StaticLink = 1
 AddCharset = 1
-Encoding = AUTO
+Encoding = UTF-8
 ModelType = 1
-UseUTF8 = 0
+UseUTF8 = 1
 Bins = 
 ExecEncoding = SYSTEM
+ClassBrowserType = 0
+AllowParallelBuilding = false
+ParellelBuildingJobs = 0
+ResourceCommand = 
 
 
 [VersionInfo]
 Major = 1
-Minor = 1
+Minor = 2
 Release = 0
 Build = 0
-LanguageID = 2052
+LanguageID = 1033
 CharsetID = 1252
-CompanyName = 小流汗黄豆
-FileVersion = 
-FileDescription = 极 域 机 房 工 具 箱
+CompanyName = 
+FileVersion = 1.2
+FileDescription = 极域工具包
 InternalName = 
 LegalCopyright = 
 LegalTrademarks = 
-OriginalFilename = 
-ProductName = 
-ProductVersion = 
+OriginalFilename = 助手.exe
+ProductName = StudentManager
+ProductVersion = 1.2.0.0
 AutoIncBuildNr = 0
 SyncProduct = 1
 
@@ -70,10 +74,63 @@ Link = 1
 Priority = 1000
 OverrideBuildCmd = 0
 BuildCmd = 
-DetectEncoding = 1
+FileEncoding = gbk
+RealEncoding = gbk
 
 
 [Unit2]
+FileName = crdisk.exe
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+CompileCpp = 1
+FileEncoding = PROJECT
+RealEncoding = ASCII
+
+
+[Unit3]
+FileName = sys.manifest
+CompileCpp = 1
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+FileEncoding = PROJECT
+RealEncoding = ASCII
+
+
+[Unit4]
+FileName = app.ico
+CompileCpp = 1
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+FileEncoding = PROJECT
+RealEncoding = ASCII
+
+
+[Unit5]
+FileName = MeltdownDFC.exe
+Folder = 
+Compile = 0
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+CompileCpp = 1
+FileEncoding = PROJECT
+RealEncoding = ASCII
+
+
+[Unit6]
 FileName = resource.rc
 Folder = Resources
 Compile = 1
@@ -81,83 +138,13 @@ Link = 0
 Priority = 1000
 OverrideBuildCmd = 0
 BuildCmd = 
-DetectEncoding = 1
-CompileCpp = 0
-
-
-[Unit3]
-FileName = sys.manifest
-CompileCpp = 0
-Folder = 
-Compile = 0
-Link = 0
-Priority = 1000
-OverrideBuildCmd = 0
-BuildCmd = 
-DetectEncoding = 1
-
-
-[Unit4]
-FileName = app.ico
-CompileCpp = 0
-Folder = 
-Compile = 0
-Link = 0
-Priority = 1000
-OverrideBuildCmd = 0
-BuildCmd = 
-DetectEncoding = 1
-
-
-[Unit5]
-FileName = main.h
-Folder = 
-Compile = 0
-Link = 0
-Priority = 1000
-OverrideBuildCmd = 0
-BuildCmd = 
-DetectEncoding = 1
 CompileCpp = 1
-
-
-[Unit6]
-FileName = uiaccess.h
-Folder = 
-Compile = 0
-Link = 0
-Priority = 1000
-OverrideBuildCmd = 0
-BuildCmd = 
-DetectEncoding = 0
-CompileCpp = 0
-FileEncoding = ASCII
+FileEncoding = PROJECT
+RealEncoding = UTF-8
 
 
 [CompilerSettings]
-cc_cmd_opt_abort_on_error = 
-cc_cmd_opt_ansi = 
-cc_cmd_opt_arch = 
-cc_cmd_opt_check_iso_conformance = 
-cc_cmd_opt_debug_info = on
-cc_cmd_opt_inhibit_all_warning = 
-cc_cmd_opt_instruction = 
-cc_cmd_opt_no_asm = 
-cc_cmd_opt_only_gen_asm_code = 
-cc_cmd_opt_optimize = 
-cc_cmd_opt_pointer_size = 
-cc_cmd_opt_profile_info = 
+cc_cmd_opt_optimize = 2
 cc_cmd_opt_std = 
-cc_cmd_opt_stop_after_preprocessing = 
-cc_cmd_opt_syntax_only = 
-cc_cmd_opt_traditional_cpp = 
-cc_cmd_opt_tune = 
 cc_cmd_opt_use_pipe = on
-cc_cmd_opt_verbose_asm = 
-cc_cmd_opt_warning_all = on
-cc_cmd_opt_warning_as_error = 
-cc_cmd_opt_warning_extra = 
-link_cmd_opt_link_objc = 
-link_cmd_opt_no_console = 
-link_cmd_opt_no_link_stdlib = 
-link_cmd_opt_strip_exe = 
+link_cmd_opt_strip_exe = on
