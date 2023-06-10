@@ -22,7 +22,7 @@ DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter);
 BOOL SuspendProcess(DWORD dwProcessID, BOOL suspend);
 int GetProcessState(DWORD dwProcessID);
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
-std::string RandomWindowTitle();
+LPCSTR RandomWindowTitle();
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
 LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 inline void PrtError(LPCSTR szDes, LRESULT lResult);
@@ -308,28 +308,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				case 1008: {
 					//TODO: 检验多种状况
 					//发送终止指令
-					HANDLE hNetFilter = CreateFileW(L"\\\\.\\tdnetfilter", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-					if(hNetFilter > (HANDLE)0){
-						DeviceIoControl(hNetFilter, 0x120014u, NULL, 0, NULL, 0, NULL, 0);
-						PrtError("解除网络限制：发送终止指令 ", NULL);
+					HANDLE hNetFilter = CreateFile("\\\\.\\TDNetFilter", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+					if(!GetLastError()){
+						DeviceIoControl(hNetFilter, 0x120014, NULL, 0, NULL, 0, NULL, 0);
+						PrtError("解除网络限制：发送终止指令", GetLastError());
 						CloseHandle(hNetFilter);
-					} else PrtError("解除网络限制：发送终止指令 ", NULL);
-					//双保险法杀掉网关服务及其守护进程
+					} else PrtError("解除网络限制：打开网络驱动", GetLastError());
+					//杀掉网关服务及其守护进程
 					bool bStateM = KillProcess(GetProcessIDFromName("MasterHelper.exe"),KILL_DEFAULT);
 					bool bStateG = KillProcess(GetProcessIDFromName("GATESRV.exe"),KILL_DEFAULT);
-					KillProcess(GetProcessIDFromName("MasterHelper.exe"),KILL_FORCE);
-					KillProcess(GetProcessIDFromName("GATESRV.exe"),KILL_FORCE);
-					Println(strcat("解除网络限制：停止相关进程", (bStateM && bStateG) ? "成功" : "失败"));
+					std::string text = "解除网络限制：停止相关进程";
+					Println(text + ((bStateM && bStateG) ? "成功" : "失败"));
 					//停止网络过滤驱动
 					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
 					SC_HANDLE hFilt = OpenService(sc, "TDNetFilter", SERVICE_STOP | DELETE);
 					SERVICE_STATUS ss = {};
 					bStateM = ControlService(hFilt, SERVICE_CONTROL_STOP, &ss);
 					DeleteService(hFilt);
-					ge;
 					CloseServiceHandle(sc);
 					CloseServiceHandle(hFilt);
-					Println(strcat("解除网络限制：停止限网驱动", bStateM ? "成功" : "失败"));
+					text = "解除网络限制：停止限网驱动";
+					Println(text + (bStateM ? "成功" : "失败"));
 					SetWindowText(TxOut, "设置完成");
 					break;
 				}
@@ -339,9 +338,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					UnhookWindowsHookEx(hCBTHook);
 					if (id == IDYES) {//LibTDUsbHook10.dll
 						//连接过滤端口（TDUsbFilterInit）
-						HANDLE hPort;
+						HANDLE hPort = NULL;
 						HRESULT hResult = FilterConnectCommunicationPort(L"\\TDFileFilterPort", 0, NULL, 0, NULL, &hPort);
-						if(hResult){
+						if(hResult || hPort <= (HANDLE)0 || GetLastError()){
 							error = hResult & 0x0000FFFF;
 							SetWindowText(TxOut, "设置失败");
 							break;
@@ -432,8 +431,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 									prozsPid = pe.th32ProcessID;
 									break;
 								}
-								IL_226:
-								;
+								IL_226:;
 							} while (Process32Next(hSnapshot, &pe));
 						}
 						CloseHandle(hSnapshot);
@@ -442,11 +440,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						char c1, c2, c3, c4;
 						n3 = time.wMonth * time.wDay, n4 = n3 % 7, n5 = n3 % 5, n6 = n3 % 3;
 						int n = n3 % 9;
-						if (n3 % 2 == 0) {
+						if (n3 % 2 == 0)
 							c1 = 108 + n4,  c2 = 75 + n,  c3 = 98 + n5,  c4 = 65 + n6;
-						} else {
+						else
 							c1 = 98 + n,  c2 = 65 + n4,  c3 = 108 + n5,  c4 = 75 + n6;
-						}
 						char c[5] = {c1, c2, c3, c4, '\0'};
 						sLog += c;
 						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
@@ -454,11 +451,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						char c1, c2, c3, c4;
 						//以下为7.2版本逻辑
 						n4 = n3 % 7, n5 = n3 % 9, n6 = n3 % 5;
-						if (n3 % 2 != 0) {
+						if (n3 % 2 != 0)
 							c1 = 103 + n5,  c2 = 111 + n4,  c3 = 107 + n6,  c4 = 48 + n4;
-						} else {
+						else 
 							c1 = 97 + n4,   c2 = 109 + n5,  c3 = 101 + n6,  c4 = 48 + n5;
-						}
 						char c[5] = {c1, c2, c3, c4, '\0'};
 						sLog += c;
 						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
@@ -488,16 +484,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				}
 				case 1011: {
 					LRESULT check = SendMessage(BtSnp, BM_GETCHECK, NULL, NULL);
-					if (check == BST_CHECKED) {
+					if (check == BST_CHECKED)
 						SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
-					} else {
+					else
 						SetWindowDisplayAffinity(hwnd, WDA_NONE);
-					}
 					break;
 				}
 				case 1012: {
 					LRESULT check = SendMessage(BtWnd, BM_GETCHECK, NULL, NULL);
-					ask = (check == BST_CHECKED) ? true : false;
+					ask = check == BST_CHECKED;
 					break;
 				}
 				case 1014: {
@@ -520,7 +515,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
 					break;
 				}
-				case 1015 :{
+				case 1015: {
 					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-7.8版本有效，该操作不可逆！！", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
 						std::string c = "8a29cc29f5951530ac69f4";
 						HKEY retKey;
@@ -569,11 +564,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						}
 						BOOL bEnable = TRUE;
 						//发送控制代码
-						if (DeviceIoControl(hDevice, 0x220000u, &bEnable, 4, NULL, 0, NULL, NULL)){
+						if (DeviceIoControl(hDevice, 0x220000, &bEnable, 4, NULL, 0, NULL, NULL))
 							Print("解驱动键盘锁：设置成功");
-						} else {
+						else
 							PrtError("解驱动键盘锁：设置失败",GetLastError());
-						}
 						CloseHandle(hDevice);
 					} else {
 						SuspendThread(keyHook);
@@ -705,8 +699,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						break;
 					}
 				case 2: {
-					std::string title = RandomWindowTitle();
-					SetWindowText(hwnd, title.c_str());
+					SetWindowText(hwnd, RandomWindowTitle());
 					DWORD id = GetProcessIDFromName(MythwareFilename);
 					if (id == 0) {
 						SendMessage(TxOut, SB_SETTEXT, 1, LPARAM("极域未运行"));
@@ -957,7 +950,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 	//以System权限启动自身
 	//详见https://blog.csdn.net/weixin_42112038/article/details/126308315
-	if (!bIsLocalSystem && (_stricmp(lpCmdLine, "-s") == 0 || _stricmp(lpCmdLine, "/s") == 0)) {
+	int argc; bool bStartAsSystem = false;
+	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+	if (argv){
+		bStartAsSystem = (!_wcsicmp(argv[1], L"-s") || !_wcsicmp(argv[1], L"/s"));
+		LocalFree(argv);
+	}
+	if (!bIsLocalSystem && bStartAsSystem) {
 		EnableDebugPrivilege();
 		HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("lsass.exe"));
 		if (!hProcess)hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("winlogon.exe"));
@@ -975,7 +974,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		error = GetLastError();
 		CloseHandle(hToken);
 		if (bResult)return 0;
-		else MessageBox(NULL, "无法以系统权限运行本程序，已以普通方式运行。欲了解更多信息，请查看上一个错误。", "启动错误", MB_ICONERROR | MB_OK);
+		else MessageBox(NULL, "无法以系统权限运行本程序，已以普通方式运行。欲了解更多信息，请查看上一个错误。", "极域工具包", MB_ICONERROR | MB_OK);
 	}
 	//主程序开始
 	WNDCLASSEX wc; /* A properties struct of our window */
@@ -999,9 +998,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	//随机窗口名
-	std::string title = RandomWindowTitle();
-
-	hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, "WindowClass", title.c_str(), (WS_OVERLAPPEDWINDOW | WS_VISIBLE)^WS_MAXIMIZEBOX ^ WS_SIZEBOX,
+	hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, "WindowClass", RandomWindowTitle(), (WS_OVERLAPPEDWINDOW | WS_VISIBLE)^WS_MAXIMIZEBOX ^ WS_SIZEBOX,
 	                      0, /* x */
 	                      0, /* y */
 	                      width, /* width */
@@ -1082,7 +1079,6 @@ BOOL GetMythwarePasswordFromRegedit(char *str) {
 bool KillProcess(DWORD dwProcessID, int way) {
 	if (way == KILL_FORCE) {
 		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, dwProcessID);
-
 		if (hSnapshot != INVALID_HANDLE_VALUE) {
 			bool rtn = true;
 			THREADENTRY32 te = {sizeof(te)};
@@ -1334,15 +1330,16 @@ bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
 	return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
 }
 
-std::string RandomWindowTitle() {
+LPCSTR RandomWindowTitle() {
 	//随机窗口名
 	std::srand((unsigned) time(NULL));
-	std::string title;
+	LPSTR title = new char[11];
+	memset(title, 0, 11);
 	for (int i = 0; i < 10; i++) {
 		int u = std::rand(), c = u % 31;//求余31是为了减少数字出现概率
-		if (c < 5)title.push_back(u % 10 + '0');
-		else if (c < 18)title.push_back(u % 26 + 'a');
-		else title.push_back(u % 26 + 'A');
+		if (c < 5)title[i] = u % 10 + '0';
+		else if (c < 18)title[i] = u % 26 + 'a';
+		else title[i] = u % 26 + 'A';
 	}
 	return title;
 }
@@ -1353,9 +1350,9 @@ LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
 	// 弹出对话框并显示异常内容
 	char message[BUFSIZ * 2] = {};
 	sprintf(message, "异常代码：0x%08X\n程序将%s，如此问题依旧存在，请联系开发者", exceptionInfo->ExceptionRecord->ExceptionCode,
-		(exceptionInfo->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE)?"退出":"尝试继续执行");
+		((exceptionInfo -> ExceptionRecord -> ExceptionFlags) & EXCEPTION_NONCONTINUABLE) ? "退出" : "尝试继续执行");
 	HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
-	int id = MessageBox(NULL, message, "程序出现异常", MB_ICONERROR | MB_YESNOCANCEL);
+	int id = MessageBox(NULL, message, "程序出现异常", MB_ICONERROR | MB_YESNOCANCEL | MB_DEFBUTTON3);
 	UnhookWindowsHookEx(hCBTHook);
 	if(id == IDYES){
 		LPSTR szCmd = GetCommandLine();
@@ -1365,8 +1362,8 @@ LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
 	// 返回处理结果，继续执行程序或退出
-	return (exceptionInfo->ExceptionRecord->ExceptionFlags & EXCEPTION_NONCONTINUABLE)?
-		EXCEPTION_EXECUTE_HANDLER:EXCEPTION_CONTINUE_EXECUTION;
+	return ((exceptionInfo -> ExceptionRecord -> ExceptionFlags) & EXCEPTION_NONCONTINUABLE)?
+	  EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_EXECUTION;
 }
 
 inline void PrtError(LPCSTR szDes, LRESULT lResult) {
@@ -1379,7 +1376,7 @@ inline void PrtError(LPCSTR szDes, LRESULT lResult) {
 	LocalFree(HLOCAL(szError));
 	//过滤末尾换行符
 	if(*(s+strlen(s)-1) == '\n')*(WORD*)(s+strlen(s)-2) = 0;
-	Print(s);
+	Println(s);
 }
 
 inline LPSTR FormatLogTime(){

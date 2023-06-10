@@ -50,48 +50,22 @@ Major = 1
 Minor = 2
 Release = 0
 Build = 0
-LanguageID = 1033
+LanguageID = 2052
 CharsetID = 1252
-CompanyName = 
+CompanyName = 小流汗黄豆
 FileVersion = 1.2
 FileDescription = 极域工具包
 InternalName = 
 LegalCopyright = 
 LegalTrademarks = 
-OriginalFilename = 助手.exe
-ProductName = StudentManager
+OriginalFilename = 
+ProductName = 极域工具包
 ProductVersion = 1.2.0.0
 AutoIncBuildNr = 0
 SyncProduct = 1
 
 
 [Unit1]
-FileName = main.cpp
-CompileCpp = 1
-Folder = 
-Compile = 1
-Link = 1
-Priority = 1000
-OverrideBuildCmd = 0
-BuildCmd = 
-FileEncoding = gbk
-RealEncoding = gbk
-
-
-[Unit2]
-FileName = crdisk.exe
-Folder = 
-Compile = 0
-Link = 0
-Priority = 1000
-OverrideBuildCmd = 0
-BuildCmd = 
-CompileCpp = 1
-FileEncoding = PROJECT
-RealEncoding = ASCII
-
-
-[Unit3]
 FileName = sys.manifest
 CompileCpp = 1
 Folder = 
@@ -104,8 +78,34 @@ FileEncoding = PROJECT
 RealEncoding = ASCII
 
 
+[Unit2]
+FileName = main.cpp
+Folder = 
+Compile = 1
+Link = 1
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+CompileCpp = 1
+FileEncoding = gbk
+RealEncoding = gbk
+
+
+[Unit3]
+FileName = resource.rc
+CompileCpp = 1
+Folder = Resources
+Compile = 1
+Link = 0
+Priority = 1000
+OverrideBuildCmd = 0
+BuildCmd = 
+FileEncoding = PROJECT
+RealEncoding = UTF-8
+
+
 [Unit4]
-FileName = app.ico
+FileName = crdisk.exe
 CompileCpp = 1
 Folder = 
 Compile = 0
@@ -131,16 +131,16 @@ RealEncoding = ASCII
 
 
 [Unit6]
-FileName = resource.rc
-Folder = Resources
-Compile = 1
+FileName = app.ico
+Folder = 
+Compile = 0
 Link = 0
 Priority = 1000
 OverrideBuildCmd = 0
 BuildCmd = 
 CompileCpp = 1
 FileEncoding = PROJECT
-RealEncoding = UTF-8
+RealEncoding = ASCII
 
 
 [CompilerSettings]
