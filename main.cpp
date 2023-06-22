@@ -410,7 +410,32 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					int n3 = time.wMonth + time.wDay;
 					int n4, n5, n6;
 					DWORD prozsPid;
-					if (version[0] == '7' &&(version[2] == '5' || version[2] == '8')) {
+					if (version[0] == '9' && version[2] == '0'){
+						//以下为9.0版本逻辑
+						PROCESSENTRY32 pe;
+						pe.dwSize = sizeof(PROCESSENTRY32);
+						HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+						if (Process32First(hSnapshot, &pe)) {
+							do {
+								//筛选长度为大于等于4（9.0）的进程名（不包含末尾“.exe”）
+								size_t uImageLength = strlen(pe.szExeFile);
+								if (uImageLength >= 8) {
+									//遍历字符
+									for (size_t j = 0; ((version[2] == '5')?(j < 10):(j < uImageLength - 4)); j++) {
+										char n7 = pe.szExeFile[j];
+										//符不符合f-o之间
+										if (!(n7 >= 102 && n7 <= 111))goto IL_13A;
+									}
+									//就是你！
+									sLog += pe.szExeFile;
+									prozsPid = pe.th32ProcessID;
+									break;
+								}
+								IL_13A:;
+							} while (Process32Next(hSnapshot, &pe));
+						}
+						CloseHandle(hSnapshot);
+					} else if (version[0] == '7' &&(version[2] == '5' || version[2] == '8')) {
 						//以下为7.5、7.8版本逻辑
 						PROCESSENTRY32 pe;
 						pe.dwSize = sizeof(PROCESSENTRY32);
@@ -467,6 +492,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						else
 							c[1] = n4 + 99,  c[2] = n5 + 106;
 						sLog += c;
+						sLog += "（使用7.2前的逻辑）";
 						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
 					}
 					Println(sLog);
@@ -516,7 +542,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 1015: {
-					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-7.8版本有效，该操作不可逆！！", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
+					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-9.0版本有效，该操作不可逆！！", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
 						std::string c = "8a29cc29f5951530ac69f4";
 						HKEY retKey;
 						LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software", 0, KEY_SET_VALUE, &retKey);
