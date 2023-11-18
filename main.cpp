@@ -35,7 +35,6 @@ std::string sOutPut;
 #define Println(text) Print(text); sOutPut+="\r\n"
 #define KILL_FORCE 1
 #define KILL_DEFAULT 2
-
 #define Set(dest, source) *(PVOID*)&(dest) = (PVOID)(source) //强行修改不同指针型数据的值
 #define ge error = GetLastError()
 HHOOK kbdHook, mseHook;
