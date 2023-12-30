@@ -1,6 +1,6 @@
 ﻿[Project]
 FileName = 助手.dev
-Name = StudentManager
+Name = MythwareToolkit
 Type = 0
 Ver = 3
 ObjFiles = 
@@ -60,7 +60,7 @@ LegalCopyright =
 LegalTrademarks = 
 OriginalFilename = 
 ProductName = 极域工具包
-ProductVersion = 1.3.0.0
+ProductVersion = 1.3
 AutoIncBuildNr = 0
 SyncProduct = 1
 

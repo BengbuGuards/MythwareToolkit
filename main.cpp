@@ -137,6 +137,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			AppendMenu(sys, MF_STRING, 2, "显示上一个错误(&E)");
 			AppendMenu(sys, MF_STRING, 4, "显示程序日志(&L)");
 			AppendMenu(sys, MF_STRING, 3, "启动任务管理器(&T)");
+			EnableMenuItem(sys, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
+			DrawMenuBar(hwnd);
 			focus = GetDlgItem(hwnd, 1013);
 			SetFocus(focus);
 			SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
@@ -429,7 +431,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					int n4, n5, n6;
 					DWORD prozsPid;
 					if (version[0] == '9' && version[2] >= '0'){
-						//以下为9.x版本逻辑（目前可验证版本：9.6）
+						//以下为9.x版本逻辑（目前可验证版本：9.7）
 						PROCESSENTRY32 pe;
 						pe.dwSize = sizeof(PROCESSENTRY32);
 						HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -437,7 +439,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 							do {
 								//筛选长度为大于等于4（9.x）的进程名（不包含末尾“.exe”）
 								size_t uImageLength = strlen(pe.szExeFile);
-								if (uImageLength >= 8) {
+								if (uImageLength >= 4) {
 									for (size_t j = 0; ((version[2] == '5')?(j < 10):(j < uImageLength - 4)); j++) {
 										char n7 = pe.szExeFile[j];
 										//f-o之间
@@ -907,7 +909,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					error = -1;
 					break;
 				}
-				case 3: {
+				case 3: {//启动任务管理器，win10版本可以置顶
 					//判断有没有启动
 					HWND h = FindWindow("TaskManagerWindow", NULL);
 					BYTE nCount = 0;
@@ -1255,9 +1257,10 @@ typedef struct _MYSYSTEM_PROCESS_INFORMATION : SYSTEM_PROCESS_INFORMATION {
 #define PSYSTEM_PROCESS_INFORMATION PMYSYSTEM_PROCESS_INFORMATION
 
 //定义函数原型
-NTSTATUS(NTSYSAPI NTAPI *NtQuerySystemInformation)
+NTSTATUS(NTSYSAPI NTAPI *MyNtQuerySystemInformation)
 (IN SYSTEM_INFORMATION_CLASS SystemInformationClass, IN OUT PVOID SystemInformation,
  IN ULONG SystemInformationLength, OUT PULONG ReturnLength OPTIONAL);
+#define NtQuerySystemInformation MyNtQuerySystemInformation
 DWORD (NTAPI *RtlNtStatusToDosErrorNoTeb)(NTSTATUS Status);
 
 //获取进程的状态
