@@ -9,23 +9,31 @@
 #include <string>
 #include <cstdlib>
 #include <ctime>
+#include <cmath>
 #undef UNICODE
 #undef _UNICODE
+
 BOOL GetMythwarePasswordFromRegedit(char *str);
-DWORD GetProcessIDFromName(LPCSTR szName);
-bool KillProcess(DWORD dwProcessID, int way);
-DWORD WINAPI ThreadProc(LPVOID lpParameter);
-BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
-BOOL CALLBACK UpdateControlDpi(HWND hwndChild, LPARAM lParam);
-bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance);
-BOOL EnableDebugPrivilege();
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
 DWORD WINAPI KeyHookThreadProc(LPVOID lpParameter);
 DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter);
+
+DWORD WINAPI ThreadProc(LPVOID lpParameter);
+BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
+bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance);
+LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
+
+void InitNTAPI();
+LPCSTR RandomWindowTitle();
+BOOL EnableDebugPrivilege();
+DWORD GetProcessIDFromName(LPCSTR szName);
+bool KillProcess(DWORD dwProcessID, int way);
 BOOL SuspendProcess(DWORD dwProcessID, BOOL suspend);
 int GetProcessState(DWORD dwProcessID);
-LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
-LPCSTR RandomWindowTitle();
-BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
+#define KILL_FORCE 1
+#define KILL_DEFAULT 2
+#define Set(dest, source) *(PVOID*)&(dest) = (PVOID)(source) //强行修改不同指针型数据的值
+
 LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 inline void PrtError(LPCSTR szDes, LRESULT lResult);
 inline LPSTR FormatLogTime();
@@ -33,9 +41,6 @@ inline LPSTR FormatLogTime();
 std::string sOutPut;
 #define Print(text) sOutPut=sOutPut+FormatLogTime()+text
 #define Println(text) Print(text); sOutPut+="\r\n"
-#define KILL_FORCE 1
-#define KILL_DEFAULT 2
-#define Set(dest, source) *(PVOID*)&(dest) = (PVOID)(source) //强行修改不同指针型数据的值
 #define ge error = GetLastError()
 HHOOK kbdHook, mseHook;
 HWND hwnd, focus; /* A 'HANDLE', hence the H, or a pointer to our window */
@@ -50,18 +55,50 @@ bool asking = false, ask = false, closingProcess = false;
 DWORD error = -1;//用于调试
 POINT p, pt;
 HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
-LPCSTR helpText = "极域工具包 v1.3\n\
-额外功能：快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
-当鼠标移至屏幕左上角/右上角时，可以选择最小化/关闭焦点窗口（你也可以关闭此功能）\n\
-使用菜单栏关闭本窗口时会自动最小化防误触，若要退出可在托盘关闭或Alt+F4\n\
-最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
-解禁工具可解禁Chrome和Edge的小游戏；若提示设置失败，可能是无权限或指定注册表键值不存在，在此情况下，通常本身就无需解禁\n\
-解键盘锁功能如果对Alt+Ctrl+Delete无效时，重新勾选即可；对极域的大多数操作都只在2015/2016版测试通过\n\
-启动时附加-s或/s命令行可以System权限启动\n\
-MeltdownDFC为冰点还原密码破解工具，crdisk为其他保护系统删除工具（慎用！）";
+LPCSTR helpText = "极域工具包 v1.2.1 | 小流汗黄豆 | 交流群828869154\n\
+额外功能：1. 快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
+2. 当鼠标移至屏幕左上角/右上角时，可以选择最小化/关闭焦点窗口（你也可以关闭此功能）\n\
+3. 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
+4. 解禁工具可解禁Chrome和Edge的小游戏；若提示设置失败，可能是无权限或指定注册表键值不存在，在此情况下，通常本身就无需解禁\n\
+5. 解键盘锁功能如果对Alt+Ctrl+Delete无效时，重新勾选即可；对极域的大多数操作都只在2015/2016版测试通过\n\
+6. 启动时附加-s或/s命令行可以System权限启动\n\
+7. MeltdownDFC为冰点还原密码破解工具，crdisk为其他保护系统删除工具（慎用！）";
 HANDLE thread/*用来刷新置顶，用Timer会有bug*/, mouHook/*解鼠标锁*/, keyHook/*解键盘锁*/;
 UINT WM_TASKBAR;
-
+struct MW_INFO{
+	HWND hwndOfBoardcast;
+	DWORD pid;
+	bool bNotResponding;
+};
+struct{ //重新实现VB的随机数功能
+	int m_rndSeed = 327680;
+	void Randomize(double Number){
+		int num = m_rndSeed, num2;
+		unsigned char bytes[sizeof(double)];
+		memcpy(bytes, &Number, sizeof(double));
+		memcpy(&num2, bytes + 4, sizeof(int));
+		num2 = ((num2 & 65535) ^ (num2 >> 16)) << 8;
+		num = (num & -16776961) | num2;
+		m_rndSeed = num;
+	}
+	float Rnd(){
+		return Rnd(1.f);
+	}
+	float Rnd(float Number){
+		int num = m_rndSeed;
+		if ((double)Number != 0.0){
+			if ((double)Number < 0.0)
+			{
+				num = *(int*)(&Number);
+				long long num2 = (long long)num & (long long)((unsigned long long)(-1));
+				num = (int)((num2 + (num2 >> 24)) & 16777215L);
+			}
+			num = (int)(((long long)num * 1140671485L + 12820163L) & 16777215L);
+		}
+		m_rndSeed = num;
+		return (float)num / 16777216.f;
+	}
+} VBMath;
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
 	switch (Message) {
@@ -74,10 +111,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			char szVersion[BUFSIZ] = {};
 			sprintf(szVersion, "系统版本：%u.%u.%u %d-bit\n程序版本：%s %d-bit\n",
 				vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber, (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, 
-				"1.3", sizeof(PVOID)*8);
+				"1.2.1", sizeof(PVOID)*8);
 			sOutPut += szVersion;
 			EnableDebugPrivilege();//提权
-			w = GetSystemMetrics(SM_CXSCREEN) - 1;//屏幕宽度（注意比实际宽度多1）
+			w = GetSystemMetrics(SM_CXSCREEN) - 1;//屏幕宽度（注意比实际可达到的坐标多1）
 			h = GetSystemMetrics(SM_CYSCREEN) - 1;//屏幕高度
 			WM_TASKBAR = RegisterWindowMessage("TaskbarCreated");//任务栏创建事件
 			thread = CreateThread(NULL, 0, ThreadProc, NULL, 0, NULL);//置顶窗口
@@ -85,10 +122,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);//鼠标锁
 			SetTimer(hwnd, 1, 1000, NULL); //检测鼠标左上角
 			SetTimer(hwnd, 2, 2000, NULL); //检测极域状态、更新标题
-			RegisterHotKey(hwnd, 0, MOD_ALT, 'C'); //Alt+C强制结束当前程序
+			RegisterHotKey(hwnd, 0, MOD_ALT, 'C'); //Alt+C+C强制结束当前程序
 			RegisterHotKey(hwnd, 1, MOD_ALT, 'W'); //Alt+W最小化顶层窗口
 			if(!RegisterHotKey(hwnd, 2, MOD_ALT, 'B')) //Alt+B显示此窗口
-				if(MessageBox(hwnd, "注册系统级热键 Alt+B 失败，有可能该应用的另一实例还在运行，请先关闭它再重新启动本程序！若“取消”则阻止程序继续启动", "极 域 工 具 包", MB_OKCANCEL | MB_ICONWARNING)==IDCANCEL){
+				if(MessageBox(hwnd, "注册系统级热键 Alt+B 失败，有可能该应用的另一实例还在运行，请先关闭它再重新启动本程序！否则唤出窗口功能将失效！若点击“取消”则阻止程序继续启动", "极 域 工 具 包", MB_OKCANCEL | MB_ICONWARNING)==IDCANCEL){
 					PostQuitMessage(0);
 					return FALSE;
 				}
@@ -119,10 +156,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			
 			BtWnd = CreateWindow(WC_BUTTON, "启用鼠标监测弹窗", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 385, 176, 130, 18, hwnd, HMENU(1012), hi, NULL);
 			BtSnp = CreateWindow(WC_BUTTON, "防止截屏", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX | (IsWindows7OrGreater() ? 0 : WS_DISABLED), 309, 176, 65, 18, hwnd, HMENU(1011), hi, NULL);
-			SendMessage(BtSnp, BM_SETCHECK, BST_CHECKED, NULL);
+			SendMessage(BtSnp, BM_SETCHECK, BST_CHECKED, 0);
 			SendMessage(hwnd, WM_COMMAND, 1011, 0);
 			BtTop = CreateWindow(WC_BUTTON, "置顶此窗口", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 8, 176, 77, 18, hwnd, HMENU(1016), hi, NULL);
-			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, NULL);
+			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, 0);
 			BtCur = CreateWindow(WC_BUTTON, "解除鼠标限制(&M)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 95, 176, 107, 18, hwnd, HMENU(1017), hi, NULL);
 			BtKbh = CreateWindow(WC_BUTTON, "解键盘锁(&C)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 213, 176, 85, 18, hwnd, HMENU(1018), hi, NULL);
 			HFONT hFont = NULL;
@@ -137,16 +174,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			AppendMenu(sys, MF_STRING, 2, "显示上一个错误(&E)");
 			AppendMenu(sys, MF_STRING, 4, "显示程序日志(&L)");
 			AppendMenu(sys, MF_STRING, 3, "启动任务管理器(&T)");
-			EnableMenuItem(sys, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
+			// EnableMenuItem(sys, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
 			DrawMenuBar(hwnd);
 			focus = GetDlgItem(hwnd, 1013);
 			SetFocus(focus);
-			SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
+			SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
 			//卸载极域进程终止hook
 			HMODULE hook = NULL;
 			if (sizeof(PVOID) == 8)hook = GetModuleHandle("LibTDProcHook64.dll");
 			else hook = GetModuleHandle("LibTDProcHook32.dll");
 			if (hook)FreeModule(hook);
+			break;
+		}
+		case WM_INITMENU: { //双击图标默认最小化
+			HMENU sys = GetSystemMenu(hwnd, FALSE);
+			SetMenuDefaultItem(sys, SC_MINIMIZE, 0);
 			break;
 		}
 		case WM_COMMAND: {
@@ -160,7 +202,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						if (KillProcess(GetProcessIDFromName(MythwareFilename), KILL_FORCE)) {
 							SetWindowText(TxOut, "执行成功");
 							Sleep(30);
-							SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
+							SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
 						} else {
 							ge;
 							SetWindowText(TxOut, "执行失败");
@@ -213,7 +255,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 
 						CloseHandle(handle);
 						CloseHandle(token);
-						SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
+						SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
 					}
 					break;
 				}
@@ -303,6 +345,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						PrtError("解禁锁定失败", ret);
 						cStatus = 1;
 					} else Println("解禁锁定成功");
+					RegCloseKey(retKey);
+					
+					RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Policies\\Microsoft\\MMC", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegSetValueEx(retKey, "RestrictToPermittedSnapins", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁微软管理控制台失败", ret);
+						cStatus = 1;
+					} else Println("解禁微软管理控制台成功");
 					RegCloseKey(retKey);
 
 					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Policies\\Google\\Chrome", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
@@ -431,29 +481,39 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					int n4, n5, n6;
 					DWORD prozsPid;
 					if (version[0] == '9' && version[2] >= '0'){
-						//以下为9.x版本逻辑（目前可验证版本：9.7）
-						PROCESSENTRY32 pe;
-						pe.dwSize = sizeof(PROCESSENTRY32);
-						HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-						if (Process32First(hSnapshot, &pe)) {
-							do {
-								//筛选长度为大于等于4（9.x）的进程名（不包含末尾“.exe”）
-								size_t uImageLength = strlen(pe.szExeFile);
-								if (uImageLength >= 4) {
-									for (size_t j = 0; ((version[2] == '5')?(j < 10):(j < uImageLength - 4)); j++) {
-										char n7 = pe.szExeFile[j];
-										//f-o之间
-										if (!(n7 >= 102 && n7 <= 111))goto IL_13A;
-									}
-									sLog += pe.szExeFile;
-									prozsPid = pe.th32ProcessID;
-									break;
-								}
-								IL_13A:;
-							} while (Process32Next(hSnapshot, &pe));
+						//以下为9.x版本逻辑（目前可验证版本：9.95）
+						//新版使用固定算法，但是依然可以确定在[107, 118]范围内
+						char name[10] = {};
+						VBMath.Randomize(double(time.wMonth * time.wDay));
+						long long n = round(double(VBMath.Rnd()) * 300000.f + 1.f);
+						for(int i = 4; i >= 0; i--){
+							name[i] = char(n % 10L + 107L);
+							n /= 10L;
 						}
-						CloseHandle(hSnapshot);
-					} else if (version[0] == '7' &&(version[2] == '5' || version[2] == '8')) {
+						prozsPid = GetProcessIDFromName(strcat(name, ".exe"));
+						if (!prozsPid){
+							PROCESSENTRY32 pe;
+							pe.dwSize = sizeof(PROCESSENTRY32);
+							HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+							if (Process32First(hSnapshot, &pe)) {
+								do {
+									//筛选长度为大于等于4（9.x）的进程名（不包含末尾“.exe”）
+									size_t uImageLength = strlen(pe.szExeFile);
+									if (uImageLength >= 8) {
+										for (char* n7 = pe.szExeFile; *n7 != '.'; n7++) {
+											//f-o之间
+											if (!(*n7 >= 102 && *n7 <= 111))goto IL_13A;
+										}
+										sLog += pe.szExeFile;
+										prozsPid = pe.th32ProcessID;
+										break;
+									}
+									IL_13A:;
+								} while (Process32Next(hSnapshot, &pe));
+							}
+							CloseHandle(hSnapshot);
+						} else sLog += name;
+					} else if (version[0] == '7' &&version[2] >= '5') {
 						//以下为7.5、7.8版本逻辑
 						PROCESSENTRY32 pe;
 						pe.dwSize = sizeof(PROCESSENTRY32);
@@ -464,10 +524,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 								size_t uImageLength = strlen(pe.szExeFile);
 								if ((version[2] == '5')?(uImageLength == 14):(uImageLength >= 8)) {
 									//遍历字符
-									for (size_t j = 0; ((version[2] == '5')?(j < 10):(j < uImageLength - 4)); j++) {
-										char n7 = pe.szExeFile[j];
+									for (char* n7 = pe.szExeFile; *n7 != '.'; n7++) {
 										//符不符合d-m之间
-										if (!(n7 >= 100 && n7 <= 109))goto IL_226;
+										if (!(*n7 >= 100 && *n7 <= 109))goto IL_226;
 									}
 									//就是你！
 									sLog += pe.szExeFile;
@@ -504,7 +563,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					} else {
 						//以下为7.2版本之前的逻辑
 						n4 = n3 % 3 + 3, n5 = n3 % 4 + 4;
-						char c[4] = {'p'};
+						char c[10] = {'p'};
 						if (n3 % 2 != 0)
 							c[1] = n5 + 102, c[2] = n4 + 98;
 						else
@@ -515,6 +574,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					}
 					Println(sLog);
 					KillProcess(prozsPid, KILL_DEFAULT);
+					KillProcess(GetProcessIDFromName("prozs.exe"), KILL_DEFAULT);
+					KillProcess(GetProcessIDFromName("przs.exe"), KILL_DEFAULT); //新版prozs的名字
 					KillProcess(GetProcessIDFromName("jfglzs.exe"), KILL_DEFAULT);
 					//停止zmserv服务防止关机
 					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
@@ -528,7 +589,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 1011: {
-					LRESULT check = SendMessage(BtSnp, BM_GETCHECK, NULL, NULL);
+					LRESULT check = SendMessage(BtSnp, BM_GETCHECK, 0, 0);
 					if (check == BST_CHECKED)
 						SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
 					else
@@ -536,7 +597,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 1012: {
-					LRESULT check = SendMessage(BtWnd, BM_GETCHECK, NULL, NULL);
+					LRESULT check = SendMessage(BtWnd, BM_GETCHECK, 0, 0);
 					ask = check == BST_CHECKED;
 					break;
 				}
@@ -554,13 +615,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					//模拟点击
 					LONG lStyle = GetWindowLong(hBdCst, GWL_STYLE);
 					BOOL bWindowing = lStyle & (WS_CAPTION | WS_SIZEBOX);
-					PostMessage(hBdCst, WM_COMMAND, MAKEWPARAM(1004, BM_CLICK), NULL);
+					PostMessage(hBdCst, WM_COMMAND, MAKEWPARAM(1004, BM_CLICK), 0);
 					SetWindowText(TxOut, bWindowing ? "全屏化完成" : "窗口化完成");
-					SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
+					SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
 					break;
 				}
 				case 1015: {
-					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-9.6版本有效，该操作不可逆！！", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
+					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-9.9版本有效，该操作不可逆！！(高版本的机房助手可能会蓝屏，慎重）", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
 						std::string c = "8a29cc29f5951530ac69f4";
 						HKEY retKey;
 						LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software", 0, KEY_SET_VALUE, &retKey);
@@ -577,7 +638,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 1016: {
-					LRESULT check = SendMessage(BtTop, BM_GETCHECK, NULL, NULL);
+					LRESULT check = SendMessage(BtTop, BM_GETCHECK, 0, 0);
 					if (check == BST_CHECKED) {
 						ResumeThread(thread);
 					} else {
@@ -587,7 +648,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 1017: {
-					LRESULT check = SendMessage(BtCur, BM_GETCHECK, NULL, NULL);
+					LRESULT check = SendMessage(BtCur, BM_GETCHECK, 0, 0);
 					if (check == BST_CHECKED) {
 						ResumeThread(mouHook);
 					} else {
@@ -597,7 +658,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				}
 				case 1018: {
-					LRESULT check = SendMessage(BtKbh, BM_GETCHECK, NULL, NULL);
+					LRESULT check = SendMessage(BtKbh, BM_GETCHECK, 0, 0);
 					if (check == BST_CHECKED) {
 						ResumeThread(keyHook);
 						//打开符号链接
@@ -698,7 +759,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					break;
 				case 1: { //Alt+W
 					HWND topHwnd = GetForegroundWindow();
-					if(!IsHungAppWindow(topHwnd))//应用程序无响应时不作处理。防止使自己堵塞，导致无响应。TODO: 此函数可能即将弃用，等待更好解决方法
+					if(!IsHungAppWindow(topHwnd))//应用程序无响应时不作处理。防止使自己堵塞，导致无响应。
 						ShowWindow(topHwnd, SW_MINIMIZE);
 					break;
 				}
@@ -750,26 +811,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						mwSts = 2;
 						SetWindowText(BtKmw, "启动极域");
 					} else {
+						//判断广播状态，顺便判断极域是否无响应
+						MW_INFO info = {}; info.pid = id;
+						BOOL bWindowing = FALSE;
+						EnumWindows(EnumWindowsProc, LPARAM(&info));
+						hBdCst = info.hwndOfBoardcast;
+						if (hBdCst) {
+							LONG lStyle = GetWindowLong(hBdCst, GWL_STYLE);
+							if (lStyle & WS_SYSMENU)bWindowing = TRUE;
+						}
+						EnableWindow(GetDlgItem(hwnd, 1014), hBdCst ? TRUE : FALSE);
+						SetDlgItemText(hwnd, 1014, bWindowing ? "广播全屏化" : "广播窗口化");
+						//极域状态
 						mwSts = GetProcessState(id);
 						std::string show;
 						if (mwSts == -1)show = "极域状态未知";
-						else if (mwSts == 0)show = "极域运行中";
+						else if (mwSts == 0 && !info.bNotResponding)show = "极域运行中";
+						else if (mwSts == 0 && info.bNotResponding)show = "极域无响应";
 						else if (mwSts == 1)show = "极域已挂起";
 						sprintf(show.data(), "%s[PID:%d]", show.c_str(), int(id));
 						SendMessage(TxOut, SB_SETTEXT, 1, LPARAM(show.c_str()));
 						SetWindowText(BtKmw, "杀掉极域");
-						//判断广播状态
-						HWND* bdCst = new HWND;
-						*bdCst = NULL;
-						BOOL bWindowing = FALSE;
-						EnumWindows(EnumWindowsProc, LPARAM(bdCst));
-						if (*bdCst) {
-							LONG lStyle = GetWindowLong(*bdCst, GWL_STYLE);
-							if (lStyle & WS_SYSMENU)bWindowing = TRUE;
-						}
-						hBdCst = *bdCst;
-						EnableWindow(GetDlgItem(hwnd, 1014), *bdCst ? TRUE : FALSE);
-						SetDlgItemText(hwnd, 1014, bWindowing ? "广播全屏化" : "广播窗口化");
 					}
 					break;
 				}
@@ -823,7 +885,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				HMENU hMenu = CreatePopupMenu();//托盘菜单
 				AppendMenu(hMenu, MF_STRING, 1, "关闭程序");
 				AppendMenu(hMenu, MF_STRING, 2, "打开界面");
-				int i = TrackPopupMenu(hMenu, TPM_RETURNCMD, pt.x, pt.y, NULL, hwnd, NULL);
+				int i = TrackPopupMenu(hMenu, TPM_RETURNCMD, pt.x, pt.y, 0, hwnd, NULL);
 				switch (i) {
 					case 1:
 						//TODO
@@ -862,7 +924,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 								BOOL sts = SuspendProcess(GetProcessIDFromName(MythwareFilename), !mwSts);
 								if (sts)SetWindowText(TxOut, "挂起/恢复成功");
 								else SetWindowText(TxOut, "挂起/恢复失败");
-								SendMessage(hwnd, WM_TIMER, WPARAM(2), NULL);
+								SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
 								break;
 							}
 						}
@@ -918,7 +980,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						WinExec("taskmgr", SW_SHOW);
 						ge;
 						do {
-							//最多等待3秒，否则停止搜寻，防止无响应
+							//最多等待3秒，否则停止搜寻，防止无响应（5秒）
 							if (++nCount == 60) {
 								SetWindowText(TxOut, "启动失败");
 								return FALSE;
@@ -950,10 +1012,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					CloseHandle(hFile);
 					break;
 				}
-				case SC_CLOSE:
-					if((GetAsyncKeyState(VK_MENU) & 1)/* && (GetAsyncKeyState(VK_F4) & 1)*/)break;//Alt+F4不最小化，直接关闭
+				/*case SC_CLOSE:
+					if((GetAsyncKeyState(VK_MENU) & 1)/* && (GetAsyncKeyState(VK_F4) & 1)*)break;//Alt+F4不最小化，直接关闭
 					PostMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, lParam);//改为最小化
-					return TRUE;
+					return TRUE;*/
 				case SC_MINIMIZE:
 					SetActiveWindow(hwnd);//TODO: 检查崩溃问题
 					focus = GetFocus();//防止最小化后焦点失效
@@ -976,6 +1038,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 	//SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
 	SetUnhandledExceptionFilter(GlobalExceptionHandler);
+	//链接未导出API
+	InitNTAPI();
 	//判断是否为系统权限
 	//https://www.cnblogs.com/idebug/p/11124664.html
 	BOOL bIsLocalSystem = FALSE;
@@ -1032,7 +1096,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	wc.hIconSm		 = LoadIcon(hInstance, "A"); /* use the name "A" to use the project icon */
 
 	if (!RegisterClassEx(&wc)) {
-		MessageBox(NULL, "窗口类注册失败！这是一个很罕见的问题，建议是重启或稍后重试。", "极 域 工 具 包", MB_ICONEXCLAMATION | MB_OK);
+		MessageBox(NULL, "窗口类注册失败！请重启程序。", "极 域 工 具 包", MB_ICONEXCLAMATION | MB_OK);
 		return 0;
 	}
 
@@ -1040,7 +1104,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, "WindowClass", RandomWindowTitle(), (WS_OVERLAPPEDWINDOW | WS_VISIBLE)^WS_MAXIMIZEBOX ^ WS_SIZEBOX, 0, 0, width, height, NULL, NULL, hInstance, NULL);
 
 	if (hwnd == NULL) {
-		MessageBox(NULL, "窗口创建失败！这是一个很罕见的问题，建议是重启或稍后重试。", "极 域 工 具 包", MB_ICONEXCLAMATION | MB_OK);
+		MessageBox(NULL, "窗口创建失败！请重启程序。", "极 域 工 具 包", MB_ICONEXCLAMATION | MB_OK);
 		return 0;
 	}
 
@@ -1060,23 +1124,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	return msg.wParam;
 }
 
-//https://blog.csdn.net/yanglx2022/article/details/46582629
-DWORD GetProcessIDFromName(LPCSTR szName) {
-	DWORD id = 0;       // 进程ID
-	PROCESSENTRY32 pe;  // 进程信息
-	pe.dwSize = sizeof(PROCESSENTRY32);
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); // 获取系统进程列表
-	if (Process32First(hSnapshot, &pe)) {   // 返回系统中第一个进程的信息
-		do {
-			if (0 == _stricmp(pe.szExeFile, szName)) { // 不区分大小写比较
-				id = pe.th32ProcessID;
-				break;
-			}
-		} while (Process32Next(hSnapshot, &pe));     // 下一个进程
-	}
-	CloseHandle(hSnapshot);     // 删除快照
-	return id;
-}
+//----------极域----------
 
 //https://blog.csdn.net/liu_zhou_zhou/article/details/118603143
 BOOL GetMythwarePasswordFromRegedit(char *str) {
@@ -1109,46 +1157,49 @@ BOOL GetMythwarePasswordFromRegedit(char *str) {
 	return TRUE;
 }
 
-//用杀掉每个线程的方法解决某些进程hook住了TerminateProcess()的问题
-bool KillProcess(DWORD dwProcessID, int way) {
-	if (way == KILL_FORCE) {
-		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, dwProcessID);
-		if (hSnapshot != INVALID_HANDLE_VALUE) {
-			bool rtn = true;
-			THREADENTRY32 te = {sizeof(te)};
-			BOOL fOk = Thread32First(hSnapshot, &te);
-			for (; fOk; fOk = Thread32Next(hSnapshot, &te)) {
-				if (te.th32OwnerProcessID == dwProcessID) {
-					HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te.th32ThreadID);
-					if (!TerminateThread(hThread, 0)) rtn = false;
-					CloseHandle(hThread);
-				}
-			}
-			CloseHandle(hSnapshot);
-			return rtn;
+//屏幕广播标题
+constexpr LPCSTR sBdCst[2] = {"屏幕广播", " 正在共享屏幕"};
+BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
+	MW_INFO* info = (MW_INFO*)lParam; DWORD pid;
+	//过滤非极域窗口。当然这里（整个程序）的问题就是无法处理多个同名进程的情况
+	GetWindowThreadProcessId(hwnd, &pid);
+	if(pid != info->pid)return TRUE;
+	//判断是否无响应（任务管理器貌似也是这么判断的）
+	HWND hOwner = GetWindow(hwnd, GW_OWNER);
+	LONG l = GetWindowLong(hwnd, GWL_EXSTYLE);
+	if((!hOwner || !IsWindowVisible(hOwner) || (l & WS_EX_APPWINDOW))
+	   /*&& IsWindowVisible(hwnd)*/ && (l & WS_EX_TOOLWINDOW) == 0 && IsHungAppWindow(hwnd))
+		info->bNotResponding = true;
+	//是否是afx类名（极域使用了MFC框架），这样减少很多比较，提高效率的同时又能减少误杀
+	char szClass[5];
+	if (GetClassName(hwnd, szClass, 5) && _stricmp(szClass, "Afx:") == 0) {
+		//获取窗口标题
+		int nLength = GetWindowTextLength(hwnd);
+		char szName[nLength + 2];
+		GetWindowText(hwnd, szName, nLength + 1);
+		//比较标题，分别是全文比较和比较末尾
+		if (_stricmp(szName, sBdCst[0]) == 0 ||
+			_stricmp(szName + nLength - strlen(sBdCst[1]), sBdCst[1]) == 0) {
+			//将目标窗口句柄通过lParam传回调用处
+			info->hwndOfBoardcast = hwnd;
+			return FALSE;
 		}
-		return false;
-	} else if (way == KILL_DEFAULT) {
-		//默认方法，稳定安全
-		HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, dwProcessID);
-		WINBOOL sta = TerminateProcess(handle, 0);
-		CloseHandle(handle);
-		return sta;
 	}
-	return false;
+	return TRUE;
 }
+/* 任务管理器判断窗口是否无响应时，调用了两个未公开函数。应该不影响我们判断，无需调用，记录在此：
+	User32.dll
+	HWND WINAPI GhostWindowFromHungWindow(HWND hwndHung);
+	HWND WINAPI HungWindowFromGhostWindow(HWND hwndGhost);
+*/
 
-DWORD WINAPI ThreadProc(LPVOID lpParameter) {
-	while (true) {
-		SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		Sleep(40);//无需过快置顶，这个东西特别耗CPU
-	}
-	return 0L;
-}
-
+//一招打断全部底层hook
 LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	return FALSE;
 }
+
+//----------界面----------
+
 //https://www.52pojie.cn/thread-542884-1-1.html 有删改 TODO: 尝试FreeModule(libTDMaster.dll)
 DWORD WINAPI KeyHookThreadProc(LPVOID lpParameter) {
 	HMODULE hModule = GetModuleHandle(NULL);
@@ -1163,11 +1214,19 @@ DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter) {
 	HMODULE hModule = GetModuleHandle(NULL);
 	while (true) {
 		mseHook = (HHOOK)SetWindowsHookEx(WH_MOUSE_LL, (HOOKPROC)HookProc, hModule, 0);
-		ClipCursor(0);
+		ClipCursor(NULL);
 		Sleep(25);
 		UnhookWindowsHookEx(mseHook);
 	}
 	return 0;
+}
+
+DWORD WINAPI ThreadProc(LPVOID lpParameter) {
+	while (true) {
+		SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		Sleep(40);//无需过快置顶，这个东西特别耗CPU
+	}
+	return 0L;
 }
 
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam) {
@@ -1204,6 +1263,51 @@ BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam) {
 	return TRUE;
 }
 
+inline LPCSTR RandomWindowTitle() {
+	//随机窗口名
+	std::srand((unsigned) time(NULL));
+	LPSTR title = new char[11];
+	memset(title, 0, 11);
+	for (int i = 0; i < 10; i++) {
+		int u = std::rand(), c = u % 31;//求余31是为了减少数字出现概率
+		if (c < 5)title[i] = u % 10 + '0';
+		else if (c < 18)title[i] = u % 26 + 'a';
+		else title[i] = u % 26 + 'A';
+	}
+	return title;
+}
+
+bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
+	icon.cbSize = sizeof(NOTIFYICONDATA); // 结构大小
+	icon.hWnd = m_hWnd; // 接收 托盘通知消息 的窗口句柄
+	icon.uID = 0;
+	icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; //表示uCallbackMessage 有效
+	icon.uCallbackMessage = WM_USER + 3; // 消息被发送到此窗口过程
+	icon.hIcon = LoadIcon(hInstance, "A");
+	strcpy(icon.szTip, "极域工具包");             // 提示文本
+	return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
+}
+
+//----------进程----------
+
+//https://blog.csdn.net/yanglx2022/article/details/46582629
+DWORD GetProcessIDFromName(LPCSTR szName) {
+	DWORD id = 0;       // 进程ID
+	PROCESSENTRY32 pe;  // 进程信息
+	pe.dwSize = sizeof(PROCESSENTRY32);
+	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); // 获取系统进程列表
+	if (Process32First(hSnapshot, &pe)) {   // 返回系统中第一个进程的信息
+		do {
+			if (0 == _stricmp(pe.szExeFile, szName)) { // 不区分大小写比较
+				id = pe.th32ProcessID;
+				break;
+			}
+		} while (Process32Next(hSnapshot, &pe));     // 下一个进程
+	}
+	CloseHandle(hSnapshot);     // 删除快照
+	return id;
+}
+
 //https://blog.csdn.net/zuishikonghuan/article/details/47746451
 BOOL EnableDebugPrivilege() {
 	HANDLE hToken;
@@ -1229,19 +1333,44 @@ BOOL EnableDebugPrivilege() {
 	return TRUE;
 }
 
+//用杀掉每个线程的方法解决某些进程hook住了TerminateProcess()的问题
+bool KillProcess(DWORD dwProcessID, int way) {
+	if (way == KILL_FORCE) {
+		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, dwProcessID);
+		if (hSnapshot != INVALID_HANDLE_VALUE) {
+			bool rtn = true;
+			THREADENTRY32 te = {sizeof(te)};
+			BOOL fOk = Thread32First(hSnapshot, &te);
+			for (; fOk; fOk = Thread32Next(hSnapshot, &te)) {
+				if (te.th32OwnerProcessID == dwProcessID) {
+					HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te.th32ThreadID);
+					if (!TerminateThread(hThread, 0)) rtn = false;
+					CloseHandle(hThread);
+				}
+			}
+			CloseHandle(hSnapshot);
+			return rtn;
+		}
+		return false;
+	} else if (way == KILL_DEFAULT) {
+		//默认方法，稳定安全
+		HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, dwProcessID);
+		WINBOOL sta = TerminateProcess(handle, 0);
+		CloseHandle(handle);
+		return sta;
+	}
+	return false;
+}
+
 //挂起进程，调用未公开函数NtSuspendProcess。suspend参数决定挂起/恢复
-NTSTATUS(NTSYSAPI NTAPI *NtSuspendProcess)(IN HANDLE Process);
-NTSTATUS(NTSYSAPI NTAPI *NtResumeProcess)(IN HANDLE Process);
+NTSTATUS (NTAPI *NtSuspendProcess)(IN HANDLE Process);
+NTSTATUS (NTAPI *NtResumeProcess)(IN HANDLE Process);
+
 BOOL SuspendProcess(DWORD dwProcessID, BOOL suspend) {
-	//NtSuspendProcess mNtSuspendProcess;
-	//NtResumeProcess mNtResumeProcess;
-	HMODULE ntdll = GetModuleHandle("ntdll.dll");
 	HANDLE handle = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, dwProcessID);
 	if (suspend) {
-		Set(NtSuspendProcess, GetProcAddress(ntdll, "NtSuspendProcess"));
 		return NtSuspendProcess(handle) == 0;
 	} else {
-		Set(NtResumeProcess, GetProcAddress(ntdll, "NtResumeProcess"));
 		return NtResumeProcess(handle) == 0;
 	}
 }
@@ -1257,7 +1386,7 @@ typedef struct _MYSYSTEM_PROCESS_INFORMATION : SYSTEM_PROCESS_INFORMATION {
 #define PSYSTEM_PROCESS_INFORMATION PMYSYSTEM_PROCESS_INFORMATION
 
 //定义函数原型
-NTSTATUS(NTSYSAPI NTAPI *MyNtQuerySystemInformation)
+NTSTATUS (NTAPI *MyNtQuerySystemInformation)
 (IN SYSTEM_INFORMATION_CLASS SystemInformationClass, IN OUT PVOID SystemInformation,
  IN ULONG SystemInformationLength, OUT PULONG ReturnLength OPTIONAL);
 #define NtQuerySystemInformation MyNtQuerySystemInformation
@@ -1269,9 +1398,6 @@ DWORD (NTAPI *RtlNtStatusToDosErrorNoTeb)(NTSTATUS Status);
 //返回1，表示进程处于挂起状态
 int GetProcessState(DWORD dwProcessID) {
 	int nStatus = -1;
-	//取函数地址
-	HMODULE ntdll = GetModuleHandle("ntdll.dll");
-	Set(NtQuerySystemInformation, GetProcAddress(ntdll, "NtQuerySystemInformation"));
 	//先调用一次，获取所需缓冲区大小
 	DWORD dwSize;
 	NtQuerySystemInformation(SystemProcessInformation, NULL, 0, &dwSize);
@@ -1285,7 +1411,6 @@ int GetProcessState(DWORD dwProcessID) {
 	if (!NT_SUCCESS(lStatus)) {
 		GlobalFree(hBuffer);
 		//NTSTATUS 转 win32 error
-		Set(RtlNtStatusToDosErrorNoTeb, GetProcAddress(ntdll, "RtlNtStatusToDosErrorNoTeb"));
 		error = RtlNtStatusToDosErrorNoTeb(lStatus);
 		return nStatus;
 	}
@@ -1315,53 +1440,16 @@ int GetProcessState(DWORD dwProcessID) {
 	return nStatus;
 }
 
-//屏幕广播标题
-constexpr LPCSTR sBdCst[2] = {"屏幕广播", " 正在共享屏幕"};
-BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-	//是否是afx类名（极域使用了MFC框架），这样减少很多比较，提高效率的同时又能减少误杀
-	char szClass[5];
-	GetClassName(hwnd, szClass, 5);
-	if (_stricmp(szClass, "Afx:") == 0) {
-		//获取窗口标题
-		int nLength = GetWindowTextLength(hwnd);
-		char szName[nLength + 2];
-		GetWindowText(hwnd, szName, nLength + 1);
-		//比较标题，分别是全文比较和比较末尾
-		if (_stricmp(szName, sBdCst[0]) == 0 ||
-		    _stricmp(szName + nLength - strlen(sBdCst[1]), sBdCst[1]) == 0) {
-			//将目标窗口句柄通过lParam传回调用处
-			HWND* pBdCst = (HWND*) lParam;
-			*pBdCst = hwnd;
-			return FALSE;
-		}
-	}
-	return TRUE;
+//取函数地址
+void InitNTAPI(){
+	HMODULE ntdll = GetModuleHandle("ntdll.dll");
+	Set(NtSuspendProcess, GetProcAddress(ntdll, "NtSuspendProcess"));
+	Set(NtResumeProcess, GetProcAddress(ntdll, "NtResumeProcess"));
+	Set(NtQuerySystemInformation, GetProcAddress(ntdll, "NtQuerySystemInformation"));
+	Set(RtlNtStatusToDosErrorNoTeb, GetProcAddress(ntdll, "RtlNtStatusToDosErrorNoTeb"));
 }
 
-bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
-	icon.cbSize = sizeof(NOTIFYICONDATA); // 结构大小
-	icon.hWnd = m_hWnd; // 接收 托盘通知消息 的窗口句柄
-	icon.uID = 0;
-	icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; //表示uCallbackMessage 有效
-	icon.uCallbackMessage = WM_USER + 3; // 消息被发送到此窗口过程
-	icon.hIcon = LoadIcon(hInstance, "A");
-	strcpy(icon.szTip, "极域工具包");             // 提示文本
-	return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
-}
-
-inline LPCSTR RandomWindowTitle() {
-	//随机窗口名
-	std::srand((unsigned) time(NULL));
-	LPSTR title = new char[11];
-	memset(title, 0, 11);
-	for (int i = 0; i < 10; i++) {
-		int u = std::rand(), c = u % 31;//求余31是为了减少数字出现概率
-		if (c < 5)title[i] = u % 10 + '0';
-		else if (c < 18)title[i] = u % 26 + 'a';
-		else title[i] = u % 26 + 'A';
-	}
-	return title;
-}
+//----------调试----------
 
 // 定义全局异常处理函数
 LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
@@ -1383,10 +1471,11 @@ LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
 		return ((exceptionInfo -> ExceptionRecord -> ExceptionFlags) & EXCEPTION_NONCONTINUABLE)?
 		EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_EXECUTION;
 	}
+	return EXCEPTION_EXECUTE_HANDLER;
 }
 
 inline void PrtError(LPCSTR szDes, LRESULT lResult) {
-	DWORD dwError = lResult == NULL ? GetLastError() : lResult & 0xFFFF;
+	DWORD dwError = lResult == 0 ? GetLastError() : lResult & 0xFFFF;
 	LPSTR szError = NULL;
 	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
 	              NULL, dwError, 0, (PTSTR)&szError, 0, NULL);
