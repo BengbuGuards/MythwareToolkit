@@ -1,3 +1,27 @@
-1 24 "sys.manifest"
+#include <windows.h>
+1 RT_MANIFEST "sys.manifest"
 2 RCDATA "MeltdownDFC.exe"
 3 RCDATA "crdisk.exe"
+A ICON "app.ico"
+
+1 VERSIONINFO
+FILEVERSION 1,2,1,0
+PRODUCTVERSION 1,2,1,0
+FILETYPE VFT_APP
+{
+  BLOCK "StringFileInfo"
+  {
+    BLOCK "080404e4"
+    {
+      VALUE "CompanyName", "小流汗黄豆"
+      VALUE "FileVersion", "1.2.1"
+      VALUE "FileDescription", "极域工具包"
+      VALUE "ProductName", "极域工具包"
+      VALUE "ProductVersion", "1.2.1"
+    }
+  }
+  BLOCK "VarFileInfo"
+  {
+    VALUE "Translation", 0x0804, 1252
+  }
+}
