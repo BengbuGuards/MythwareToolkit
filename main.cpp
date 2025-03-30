@@ -55,7 +55,7 @@ bool asking = false, ask = false, closingProcess = false;
 DWORD error = -1;//用于调试
 POINT p, pt;
 HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
-LPCSTR helpText = "极域工具包 v1.2.1 | 小流汗黄豆 | 交流群828869154\n\
+LPCSTR helpText = "极域工具包 v1.2.2 | 小流汗黄豆 | 交流群828869154（进群请表明您是从极域工具包而来）\n\
 额外功能：1. 快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
 2. 当鼠标移至屏幕左上角/右上角时，可以选择最小化/关闭焦点窗口（你也可以关闭此功能）\n\
 3. 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
@@ -111,7 +111,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			char szVersion[BUFSIZ] = {};
 			sprintf(szVersion, "系统版本：%u.%u.%u %d-bit\n程序版本：%s %d-bit\n",
 				vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber, (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, 
-				"1.2.1", sizeof(PVOID)*8);
+				"1.2.2", sizeof(PVOID)*8);
 			sOutPut += szVersion;
 			EnableDebugPrivilege();//提权
 			w = GetSystemMetrics(SM_CXSCREEN) - 1;//屏幕宽度（注意比实际可达到的坐标多1）
@@ -130,7 +130,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					return FALSE;
 				}
 			HINSTANCE hi = ((LPCREATESTRUCT) lParam)->hInstance;
-			TxLnk = CreateWindow("SysLink", "极域工具包 <a href=\"https://blog.csdn.net/weixin_42112038?type=blog\">博客</a>", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 8, 8, 120, 20, hwnd, HMENU(1001), hi, NULL);
+			TxLnk = CreateWindow("SysLink", "极域工具包 <a href=\"https://github.com/BengbuGuards/MythwareToolkit\">GitHub</a>", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 8, 8, 120, 20, hwnd, HMENU(1001), hi, NULL);
 			BtAbt = CreateWindow(WC_BUTTON, "关于/帮助", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 166, 3, 90, 30, hwnd, HMENU(1002), hi, NULL);
 			//获取密码
 			char str[BUFSIZ] = {};
@@ -262,6 +262,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				case 1007: {
 					BYTE cStatus = NO_ERROR;
 
+					std::string sMsg = "操作完成。已解禁的项目有：";
+
 					//HKEY_CURRENT_USER\Software\Policies\Microsoft\Windows\System:DisableCMD->0
 					HKEY retKey;
 					DWORD value = 0;
@@ -270,7 +272,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁cmd失败", ret);
 						cStatus = 1;
-					} else Println("解禁cmd成功");
+					} else {Println("解禁cmd成功"); sMsg += "命令提示符、";}
 					RegCloseKey(retKey);
 
 					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableRegistryTools->0
@@ -279,14 +281,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁注册表编辑器失败", ret);
 						cStatus = 1;
-					} else Println("解禁注册表编辑器成功");
+					} else {Println("解禁注册表编辑器成功"); sMsg += "注册表编辑器、";}
 
 					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableTaskMgr->0
 					ret = RegSetValueEx(retKey, "DisableTaskMgr", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁任务管理器失败", ret);
 						cStatus = 1;
-					} else Println("解禁任务管理器成功");
+					} else {Println("解禁任务管理器成功"); sMsg += "任务管理器、";}
 					RegCloseKey(retKey);
 
 					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:NoRun->0
@@ -295,31 +297,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁Win+R运行失败", ret);
 						cStatus = 1;
-					} else Println("解禁Win+R运行成功，重启资源管理器即可生效");
+					} else {Println("解禁Win+R运行成功"); sMsg += "Win+R运行（需重启资源管理器）、";}
 
 					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:RestrictRun->0
 					ret = RegSetValueEx(retKey, "RestrictRun", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));//也有作用
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解除程序运行限制失败", ret);
 						cStatus = 1;
-					} else Println("解除程序运行限制成功，重启资源管理器即可生效");
+					} else {Println("解除程序运行限制成功"); sMsg += "程序运行限制（需重启资源管理器）、";}
 					RegCloseKey(retKey);
-
-					//HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\taskkill.exe:debugger:(
-					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\taskkill.exe", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					ret = RegDeleteValue(retKey, "debugger");
-					if (ret != ERROR_SUCCESS) {
-						PrtError("解禁taskkill失败", ret);
-						//cStatus = 1;
-					} else Println("解禁taskkill成功");
-
-					//HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\ntsd.exe:debugger:(
-					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\ntsd.exe", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					ret = RegDeleteValue(retKey, "debugger");
-					if (ret != ERROR_SUCCESS) {
-						PrtError("解禁ntsd失败", ret);
-						//cStatus = 1;
-					} else Println("解禁ntsd成功");
 
 					RegCloseKey(retKey);
 					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer:NoLogOff->0
@@ -330,13 +316,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁注销栏失败", ret);
 						cStatus = 1;
-					} else Println("解禁注销栏成功");
+					} else {Println("解禁注销栏成功"); sMsg += "注销账户、";}
 
 					ret = RegSetValueEx(retKey, "StartMenuLogOff", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁开始菜单注销失败", ret);
 						cStatus = 1;
-					} else Println("解禁开始菜单注销成功");
+					} else {Println("解禁开始菜单注销成功"); sMsg += "开始菜单注销、";}
+
+					ret = RegSetValueEx(retKey, "NoTrayContextMenu", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁任务栏右键菜单失败", ret);
+						cStatus = 1;
+					} else {Println("解禁任务栏右键菜单成功"); sMsg += "任务栏右键菜单、";}
 					RegCloseKey(retKey);
 
 					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
@@ -344,7 +336,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁锁定失败", ret);
 						cStatus = 1;
-					} else Println("解禁锁定成功");
+					} else {Println("解禁锁定成功"); sMsg += "锁定账户、";}
 					RegCloseKey(retKey);
 					
 					RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Policies\\Microsoft\\MMC", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
@@ -352,15 +344,47 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁微软管理控制台失败", ret);
 						cStatus = 1;
-					} else Println("解禁微软管理控制台成功");
+					} else {Println("解禁微软管理控制台成功"); sMsg += "微软管理控制台、";}
 					RegCloseKey(retKey);
+
+					static const std::pair<LPCSTR, LPCSTR> images[] = {
+						{"taskkill.exe","taskkill"}, 
+						{"ntsd.exe", "ntsd"},
+						{"sidebar.exe", "Win7桌面侧栏"},
+						{"Chess.exe", "Win7象棋（Chess Titans）"},
+						{"FreeCell.exe", "Win7空当接龙"},
+						{"Hearts.exe", "Win7红心大战"},
+						{"Minesweeper.exe", "扫雷（Minesweeper.exe）"},
+						{"PurblePlace.exe", "Win7 Purble Place"},
+						{"Mahjong.exe", "Win7麻将（Mahjong Titans）"},
+						{"SpiderSolitaire.exe", "Win7蜘蛛纸牌"},
+						{"bckgzm.exe", "Internet双陆棋"},
+						{"chkrzm.exe", "Internet跳棋"},
+						{"shvlzm.exe", "Internet黑桃王"},
+						{"Solitaire.exe", "Win7纸牌"},
+						{"winmine.exe", "扫雷（winmine.exe）"},
+						{"Magnify.exe", "放大镜"},
+						{"QQPCTray.exe", "QQPCTray"}
+					};
+					char szPath[BUFSIZ], outputBuf[BUFSIZ];
+					for(std::pair<LPCSTR, LPCSTR> p:images){
+						strcpy(szPath, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\");
+						strcat(szPath, p.first);
+						RegOpenKeyEx(HKEY_LOCAL_MACHINE, szPath, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+						ret = RegDeleteValue(retKey, "debugger");
+						if (ret == ERROR_SUCCESS) {
+							sprintf(outputBuf, "解禁%s成功", p.second);
+							Println(outputBuf);
+							sMsg += p.second; sMsg += "、";
+						}
+					}
 
 					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Policies\\Google\\Chrome", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
 					ret = RegDeleteValue(retKey, "AllowDinosaurEasterEgg");
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁Chrome恐龙游戏失败", ret);
 						cStatus = 1;
-					} else Println("解禁Chrome恐龙游戏成功");
+					} else {Println("解禁Chrome恐龙游戏成功"); sMsg += "Chrome恐龙游戏、";}
 					RegCloseKey(retKey);
 
 					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\Policies\\Microsoft\\Edge", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
@@ -368,11 +392,35 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁Edge冲浪游戏失败", ret);
 						cStatus = 1;
-					} else Println("解禁Edge冲浪游戏成功");
+					} else {Println("解禁Edge冲浪游戏成功"); sMsg += "Edge冲浪游戏、";}
+
+					ret = RegDeleteValue(retKey, "WebWidgetAllowed");
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁Edge桌面栏失败", ret);
+						cStatus = 1;
+					} else {Println("解禁Edge桌面栏成功"); sMsg += "Edge栏、";}
+					RegCloseKey(retKey);
+
+					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegDeleteValue(retKey, "ShowTaskViewButton");
+					if (ret != ERROR_SUCCESS) {
+						PrtError("解禁任务视图按钮失败", ret);
+						cStatus = 1;
+					} else {Println("解禁任务视图按钮成功"); sMsg += "任务视图按钮，";}
+					RegCloseKey(retKey);
+
+					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegDeleteValue(retKey, "Scancode Map");
+					if (ret != ERROR_SUCCESS) {
+						PrtError("清除键盘映射失败", ret);
+						cStatus = 1;
+					} else {Println("清除键盘映射成功"); sMsg += "Tab键（键盘重映射），";}
 					RegCloseKey(retKey);
 
 					if (cStatus == NO_ERROR)SetWindowText(TxOut, "设置成功");
-					else SetWindowText(TxOut, "设置部分失败。。");
+					else SetWindowText(TxOut, "设置部分成功");
+					sMsg += "建议重启资源管理器应用一些功能（若要恢复Tab键，必须注销）。";
+					MessageBox(hwnd, sMsg.c_str(), "说明", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
 					break;
 				}
 				case 1008: {
