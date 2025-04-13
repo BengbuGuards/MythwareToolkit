@@ -272,7 +272,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					if (ret != ERROR_SUCCESS) {
 						PrtError("解禁cmd失败", ret);
 						cStatus = 1;
-					} else {Println("解禁cmd成功"); sMsg += "命令提示符、";}
+					} else {Println("解禁cmd成功"); sMsg += "命令提示符、";} //TODO: 对已经为0的项目，不展示为已解禁
 					RegCloseKey(retKey);
 
 					//HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System:DisableRegistryTools->0
@@ -528,8 +528,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					int n3 = time.wMonth + time.wDay;
 					int n4, n5, n6;
 					DWORD prozsPid;
-					if (version[0] == '9' && version[2] >= '0'){
-						//以下为9.x版本逻辑（目前可验证版本：9.95）
+					if (version[0] == '9' && version[2] >= '0' || version[0] == '1' && version[1] == '0'){
+						//以下为9.x、10.x版本逻辑（目前可验证版本：10.1）
 						//新版使用固定算法，但是依然可以确定在[107, 118]范围内
 						char name[10] = {};
 						VBMath.Randomize(double(time.wMonth * time.wDay));
@@ -670,7 +670,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				}
 				case 1015: {
 					if (MessageBox(hwnd, "你是否要将学生机房管理助手的密码设成12345678？仅7.1-9.9版本有效，该操作不可逆！！(高版本的机房助手可能会蓝屏，慎重）", "警告", MB_YESNO | MB_ICONWARNING) == IDYES) {
-						std::string c = "8a29cc29f5951530ac69f4";
+						std::string c = "8a29cc29f5951530ac69f4";//貌似9.9x之后新版是8a29cc29f5951530ac69
 						HKEY retKey;
 						LONG ret = RegOpenKeyEx(HKEY_CURRENT_USER, "Software", 0, KEY_SET_VALUE, &retKey);
 						if (ret != ERROR_SUCCESS) {
