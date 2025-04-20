@@ -549,8 +549,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 									size_t uImageLength = strlen(pe.szExeFile);
 									if (uImageLength >= 8) {
 										for (char* n7 = pe.szExeFile; *n7 != '.'; n7++) {
-											//f-o之间
-											if (!(*n7 >= 102 && *n7 <= 111))goto IL_13A;
+											//f-v之间
+											if (!(*n7 >= 102 && *n7 <= 118))goto IL_13A;
 										}
 										sLog += pe.szExeFile;
 										prozsPid = pe.th32ProcessID;
@@ -1140,8 +1140,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	/* White, COLOR_WINDOW is just a #define for a system color, try Ctrl+Clicking it */
 	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
 	wc.lpszClassName = "WindowClass";
-	wc.hIcon		 = LoadIcon(hInstance, "A"); /* Load a standard icon */
-	wc.hIconSm		 = LoadIcon(hInstance, "A"); /* use the name "A" to use the project icon */
+	wc.hIcon		 = LoadIcon(hInstance, "MAINICON"); /* Load a standard icon */
+	wc.hIconSm		 = LoadIcon(hInstance, "MAINICON"); /* use the name "A" to use the project icon */
 
 	if (!RegisterClassEx(&wc)) {
 		MessageBox(NULL, "窗口类注册失败！请重启程序。", "极 域 工 具 包", MB_ICONEXCLAMATION | MB_OK);
@@ -1331,7 +1331,7 @@ bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
 	icon.uID = 0;
 	icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; //表示uCallbackMessage 有效
 	icon.uCallbackMessage = WM_USER + 3; // 消息被发送到此窗口过程
-	icon.hIcon = LoadIcon(hInstance, "A");
+	icon.hIcon = LoadIcon(hInstance, "MAINICON");
 	strcpy(icon.szTip, "极域工具包");             // 提示文本
 	return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
 }

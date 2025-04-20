@@ -2,7 +2,7 @@
 1 RT_MANIFEST "sys.manifest"
 2 RCDATA "MeltdownDFC.exe"
 3 RCDATA "crdisk.exe"
-A ICON "app.ico"
+MAINICON ICON "app.ico"
 
 1 VERSIONINFO
 FILEVERSION 1,2,2,0
@@ -25,5 +25,3 @@ FILETYPE VFT_APP
     VALUE "Translation", 0x0804, 1252
   }
 }
-
-//TODO: 让任务管理器的进程视图也展示自定义图标
