@@ -3,6 +3,7 @@
 极域工具包，支持多种控制极域以及学生机房管理助手的工具。StudentMain、Mythware、Jiyu
 
 ![截图](https://img-blog.csdnimg.cn/60d799d3637b4fe8a99c295a6bad605b.png#pic_center)
+
 截图（1.2.1）
 
 如果喜欢本项目，给个star可以吗？￣へ￣
@@ -13,7 +14,7 @@
 
 注：以下*斜体标注*的内容表示即将到来的功能
 
-**README适应版本：1.2.2**
+**README适应版本：v1.2.2-patch**
 
 ### 极域控制
 
@@ -32,7 +33,7 @@
 - 支持关闭6.8-10.1版本的学生机房管理助手（其中某些版本可能不能正常工作，但是依然可以利用快捷键清除漏网之鱼）
 - 将学生机房管理助手密码更改为12345678（7.1-9.9x版本有效，但是不推荐在助手运行期间更改，因为会蓝屏）。**最新版本的密码逻辑有变，所以建议不要更改。**
 - 可以解除cmd（命令提示符）、注册表编辑器、任务管理器、注销、管理控制台、taskkill等程序，还可以解禁Chrome恐龙游戏和Edge冲浪游戏，以及Win7系统自带的一些游戏。
-- 新版本机房助手会禁用Tab键，请在使用“解禁系统程序功能“后注销重登，才能解锁（一般此操作不会触发系统还原，但别忘了重新打开本软件）。
+- 新版本机房助手会禁用Tab键，请在使用“解禁系统程序”功能后注销重登，才能解锁（一般此操作不会触发系统还原，但别忘了重新打开本软件）。
 - 可以重启资源管理器（explorer.exe）
 
 ### 通用功能
@@ -85,13 +86,14 @@ cd C:\Windows\System32\
 .\sc.exe delete TDFileFilter #可选
 ```
 
-### 学生机房管理助手的软件黑名单（9.0版本）
+### 学生机房管理助手的软件黑名单（10.1版本）
 
 进程名包含这些词就会蓝屏（加粗的名字不仅匹配进程名，还匹配窗口名）：
 
-vmware、VirtualBox、Virtual PC、**虚拟机**、**电子教室**、ProcView、IceSword、Procmast.exe、ProcessManager.exe、rstray.exe、PFW.exe、FTCleaner.exe、Wsyscheck.exe、XueTr.exe、prom.exe、ProcessX.exe、pchunter、**Killer.exe**、procmgr.exe、ProcessHacker.exe、killcontrol、PowerTool32.exe、360taskmgr、YtWinAst、KVFWMain.exe、ECQ-PS.exe、SnipeSword、procexp、**MsgFlood.exe**、ProcessOVER、procdeal、**桌面**、**任务**、**进程**、Prayaya、dexpot.exe、vdeskman.exe、mdesk.exe、**virtualdesk**、multideskt.exe、VirDsk.exe、IDesktop.exe、YtMDesk.exe、coon.exe、zmqh.exe、DexpotProPortable.exe、Desktops.exe、wisedesktop.exe、DESKTOP.exe、Vdesktop.exe、MagicDesktop.exe、multidesktop.exe、 **v13**（这个有特别关照，在蓝屏窗口加载时还会自动杀掉带有这个名字的进程）、RegWX64.exe、QQPCNetFlow.exe、BDMANetLimiter.exe、netmon.exe、360netman.exe、HelloTeacher.exe、EHacker.exe、PowerTool64.exe、zydesk.exe、perfmon.exe、**吾爱破解**、**极域**、prcview.exe、processlasso.exe、netfuke.exe、**去除控制**、**课堂狂欢器**、**课堂工具**、fuckmythware、SpecialSet.exe、JiYuTrainer.exe、skieskiller、WindowsKernelExplorer.exe、msconfig.exe。另外包括任务管理器，会有独特的锁定蓝屏界面。
+vmware、VirtualBox、Virtual PC、**虚拟机**、**电子教室**、ProcView、IceSword、Procmast.exe、**toolkit_32-bits.exe**（有点搞笑，只捉按规范命名的32位程序，随便一改都搞得定）、rstray.exe、PFW.exe、FTCleaner.exe、Wsyscheck.exe、XueTr.exe、prom.exe、ProcessX.exe、pchunter、**Killer.exe**、procmgr.exe、ProcessHacker.exe、killcontrol、PowerTool32.exe、360taskmgr、YtWinAst、KVFWMain.exe、ECQ-PS.exe、SnipeSword、procexp、**MsgFlood.exe**、ProcessOVER、procdeal、**多桌面**、**任务管理**、**进程**、Prayaya、dexpot.exe、vdeskman.exe、mdesk.exe、**virtualdesk**、multideskt.exe、VirDsk.exe、IDesktop.exe、YtMDesk.exe、coon.exe、zmqh.exe、DexpotProPortable.exe、Desktops.exe、wisedesktop.exe、DESKTOP.exe、Vdesktop.exe、MagicDesktop.exe、multidesktop.exe、**weRs0cqa**（这个有特别关照，在蓝屏窗口加载时还会自动杀掉带有这个名字的进程）、RegWX64.exe、QQPCNetFlow.exe、BDMANetLimiter.exe、netmon.exe、360netman.exe、HelloTeacher.exe、EHacker.exe、PowerTool64.exe、zydesk.exe、perfmon.exe、**吾爱破解**、**极域**、prcview.exe、processlasso.exe、netfuke.exe、**去除控制**、**课堂狂欢器**、**课堂工具**、fuckmythware、SpecialSet.exe、JiYuTrainer.exe、skieskiller、WindowsKernelExplorer.exe、msconfig.exe、**iu杀毒**、**窗口拓印**
+。另外包括任务管理器，会有独特的锁定蓝屏界面。
 
-### 在线根据明文生成学生机房管理助手密码（7.2版本以上，9.9x以下）
+### 在线根据明文生成学生机房管理助手密码（7.2版本以上，9.98以下）
 
 访问[这个网站](https://try.dot.net/)，在代码运行窗口输入如下内容，便可生成密文，将密文写入注册表HKEY_CURRENT_USER\Software:n（REG_SZ），机房助手密码将会被立即更改：（也可以本地运行）
 
@@ -139,7 +141,7 @@ public class Program
 		Console.WriteLine(str);
 	}
 }
-// 期望输出：8a29cc29f5951530ac69f4，但是对于9.9x以上版本为8a29cc29f5951530ac69需自己改
+// 期望输出：8a29cc29f5951530ac69f4，但是对于9.99以上版本为8a29cc29f5951530ac69需自己改
 ```
 
 </details>

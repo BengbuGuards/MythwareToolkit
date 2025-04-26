@@ -8,7 +8,7 @@ CD       = cd /d
 LIBS     = "-s" "-mwindows" "C:/Windows/System32/Comctl32.dll" "C:/Windows/System32/FltLib.dll" "-static"
 INCS     = 
 CXXINCS  = 
-CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-lntdll"
+CXXFLAGS = $(CXXINCS) "-O3" "-pipe" "-lntdll"
 CFLAGS   = $(INCS) "-O2" "-pipe"
 WINDRESFLAGS = 
 RES      = resource.res
@@ -25,7 +25,7 @@ clean: clean-custom
 	-$(RM) $(CLEANOBJ) >NUL 2>&1
 
 MythwareToolkit.exe: $(OBJ)
-	$(CXX) $(LINKOBJ) -o "bin/MythwareToolkit.exe" $(LIBS) 
+	$(CXX) $(LINKOBJ) -o "bin/MythwareToolkit.exe" $(LIBS)
 
 main.o: main.cpp
 	$(CXX) -c "main.cpp" -o "bin/main.o"$(CXXFLAGS)

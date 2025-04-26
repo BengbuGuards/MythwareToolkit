@@ -53,14 +53,14 @@ Build = 0
 LanguageID = 2052
 CharsetID = 1252
 CompanyName = 小流汗黄豆
-FileVersion = 1.2.2
+FileVersion = 1.2.2-patch
 FileDescription = 极域工具包
 InternalName = 
 LegalCopyright = 
 LegalTrademarks = 
 OriginalFilename = 
 ProductName = 极域工具包
-ProductVersion = 1.2.2
+ProductVersion = 1.2.2-patch
 AutoIncBuildNr = 0
 SyncProduct = 1
 

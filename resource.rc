@@ -5,8 +5,8 @@
 MAINICON ICON "app.ico"
 
 1 VERSIONINFO
-FILEVERSION 1,2,2,0
-PRODUCTVERSION 1,2,2,0
+FILEVERSION 1,2,2,1
+PRODUCTVERSION 1,2,2,1
 FILETYPE VFT_APP
 {
   BLOCK "StringFileInfo"
@@ -14,10 +14,10 @@ FILETYPE VFT_APP
     BLOCK "080404e4"
     {
       VALUE "CompanyName", "小流汗黄豆"
-      VALUE "FileVersion", "1.2.2"
+      VALUE "FileVersion", "1.2.2-patch"
       VALUE "FileDescription", "极域工具包"
       VALUE "ProductName", "极域工具包"
-      VALUE "ProductVersion", "1.2.2"
+      VALUE "ProductVersion", "1.2.2-patch"
     }
   }
   BLOCK "VarFileInfo"
