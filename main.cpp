@@ -29,6 +29,7 @@ LPCSTR RandomWindowTitle();
 BOOL EnableDebugPrivilege();
 DWORD GetProcessIDFromName(LPCSTR szName);
 bool KillProcess(DWORD dwProcessID, int way);
+bool KillAllProcessWithName(LPCSTR name, int way);
 BOOL SuspendProcess(DWORD dwProcessID, BOOL suspend);
 int GetProcessState(DWORD dwProcessID);
 #define KILL_FORCE 1
@@ -56,7 +57,7 @@ bool asking = false, ask = false, closingProcess = false;
 DWORD error = -1;//ÓÃÓÚµ÷ÊÔ
 POINT p, pt;
 HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
-LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.2-patch | Ğ¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇë×¢Ã÷¼«Óò¹¤¾ß°ü£©\n\
+LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.3 | Ğ¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇë×¢Ã÷¼«Óò¹¤¾ß°ü£©\n\
 ¶îÍâ¹¦ÄÜ£º1. ¿ì½İ¼üAlt+CË«»÷É±µôµ±Ç°½ø³Ì£¬Alt+W×îĞ¡»¯¶¥²ã´°¿Ú£¬Alt+B»½ÆğÖ÷´°¿Ú\n\
 2. µ±Êó±êÒÆÖÁÆÁÄ»×óÉÏ½Ç/ÓÒÉÏ½ÇÊ±£¬¿ÉÒÔÑ¡Ôñ×îĞ¡»¯/¹Ø±Õ½¹µã´°¿Ú£¨ÄãÒ²¿ÉÒÔ¹Ø±Õ´Ë¹¦ÄÜ£©\n\
 3. ×îĞ¡»¯Ê±Òş²Øµ½ÈÎÎñÀ¸ÍĞÅÌ£¬×ó¼üË«»÷´ò¿ªÖ÷½çÃæ£¬ÓÒ¼üµ¥»÷µ÷³ö²Ëµ¥\n\
@@ -66,14 +67,15 @@ LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.2-patch | Ğ¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇ
 7. MeltdownDFCÎª±ùµã»¹Ô­ÃÜÂëÆÆ½â¹¤¾ß£¬crdiskÎªÆäËû±£»¤ÏµÍ³É¾³ı¹¤¾ß£¨É÷ÓÃ£¡£©";
 HANDLE thread/*ÓÃÀ´Ë¢ĞÂÖÃ¶¥£¬ÓÃTimer»áÓĞbug*/, mouHook/*½âÊó±êËø*/, keyHook/*½â¼üÅÌËø*/;
 UINT WM_TASKBAR;
-struct MW_INFO{
+enum RunLevel {Unknown, User, Admin, System} eLevel;
+struct MW_INFO {
 	HWND hwndOfBoardcast;
 	DWORD pid;
 	bool bNotResponding;
 };
-struct{ //ÖØĞÂÊµÏÖVBµÄËæ»úÊı¹¦ÄÜ
+struct { //ÖØĞÂÊµÏÖVBµÄËæ»úÊı¹¦ÄÜ
 	int m_rndSeed = 327680;
-	void Randomize(double Number){
+	void Randomize(double Number) {
 		int num = m_rndSeed, num2;
 		unsigned char bytes[sizeof(double)];
 		memcpy(bytes, &Number, sizeof(double));
@@ -82,14 +84,13 @@ struct{ //ÖØĞÂÊµÏÖVBµÄËæ»úÊı¹¦ÄÜ
 		num = (num & -16776961) | num2;
 		m_rndSeed = num;
 	}
-	float Rnd(){
+	float Rnd() {
 		return Rnd(1.f);
 	}
-	float Rnd(float Number){
+	float Rnd(float Number) {
 		int num = m_rndSeed;
-		if ((double)Number != 0.0){
-			if ((double)Number < 0.0)
-			{
+		if ((double)Number != 0.0) {
+			if ((double)Number < 0.0) {
 				num = *(int*)(&Number);
 				long long num2 = (long long)num & (long long)((unsigned long long)(-1));
 				num = (int)((num2 + (num2 >> 24)) & 16777215L);
@@ -112,7 +113,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			char szVersion[BUFSIZ] = {};
 			sprintf(szVersion, "ÏµÍ³°æ±¾£º%u.%u.%u %d-bit\n³ÌĞò°æ±¾£º%s %d-bit\n",
 				vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber, (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, 
-				"1.2.2-patch", sizeof(PVOID)*8);
+				"1.2.3", sizeof(PVOID)*8);
 			sOutPut += szVersion;
 			EnableDebugPrivilege();//ÌáÈ¨
 			w = GetSystemMetrics(SM_CXSCREEN) - 1;//ÆÁÄ»¿í¶È£¨×¢Òâ±ÈÊµ¼Ê¿É´ïµ½µÄ×ø±ê¶à1£©
@@ -163,6 +164,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, 0);
 			BtCur = CreateWindow(WC_BUTTON, "½â³ıÊó±êÏŞÖÆ(&M)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 95, 176, 107, 18, hwnd, HMENU(1017), hi, NULL);
 			BtKbh = CreateWindow(WC_BUTTON, "½â¼üÅÌËø(&C)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 213, 176, 85, 18, hwnd, HMENU(1018), hi, NULL);
+			HWND hToolTip = CreateWindowEx(0, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_ALWAYSTIP, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwnd, NULL, hi, NULL);
+			TOOLINFO ti = { sizeof(ti) };
+			ti.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
+			ti.hwnd = hwnd;
+			ti.uId = (UINT_PTR)TxLnk;
+			switch(eLevel){
+				case User:
+					ti.lpszText = "ÓÃ»§È¨ÏŞ";
+					break;
+				case Admin:
+					ti.lpszText = "¹ÜÀíÔ±È¨ÏŞ";
+					break;
+				case System:
+					ti.lpszText = "ÏµÍ³È¨ÏŞ";
+					break;
+				default:
+					ti.lpszText = "È¨ÏŞÎ´Öª";
+			}
+			SendMessage(hToolTip, TTM_ADDTOOL, 0, (LPARAM)&ti);
+
 			HFONT hFont = NULL;
 			NONCLIENTMETRICS info;
 			info.cbSize = sizeof(NONCLIENTMETRICS);
@@ -376,8 +397,50 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						cStatus = 1;
 					}
 					RegCloseKey(retKey);
+
+					//Çå³ı»ú·¿ÖúÊÖ¶ÔÄ³Ğ©ÍøÒ³µÄ·âÉ±£¨v10.2Æğ£¬°üÀ¨pokiÍøºÍÆäËûÒ»Ğ©ÍøÕ¾£©£¬ÕâÒ»²¿·ÖÊÖ¶¯Íê³ÉÒ²ĞĞ
+					LPCSTR path = "C:\\Windows\\System32\\drivers\\etc\\hosts";
+					bool bHandled = false;
+					HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+											  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+					std::string tempPath = path + std::string(".tmp");
+					HANDLE hTemp = CreateFile(tempPath.c_str(), GENERIC_WRITE, 0, NULL,
+											  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+					if(hFile != INVALID_HANDLE_VALUE && hTemp != INVALID_HANDLE_VALUE) {
+						char buf[4096];
+						DWORD read;
+						std::string line;
+						while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0) {
+							for (DWORD i = 0; i < read; ++i) {
+								if (buf[i] == '\n') {
+									if (line.find("127.0.0.1") != 0 ||
+										line.find_first_not_of(" \t") < line.find("127.0.0.1")) {
+										line += '\n';
+										WriteFile(hTemp, line.c_str(), line.size(), NULL, NULL);
+									} else bHandled = true;
+									line.clear();
+								}
+								else
+									line += buf[i];
+							}
+						}
+						if (!line.empty()){
+							if (!line.empty() && (line.find("127.0.0.1") != 0 ||
+												  line.find_first_not_of(" \t") < line.find("127.0.0.1"))) {
+								WriteFile(hTemp, line.c_str(), line.size(), NULL, NULL);
+							} else bHandled = true;
+						}
+						CloseHandle(hFile);
+						CloseHandle(hTemp);
+						DeleteFile(path);
+						MoveFile(tempPath.c_str(), path);
+						if(bHandled){
+							cStatus = 1;
+							sMsg += "²¿·ÖÍøÕ¾ÏŞÖÆ¡¢";
+						}
+					}
 					SetWindowText(TxOut, "ÉèÖÃ³É¹¦");
-					if (cStatus){
+					if (cStatus) {
 						sMsg.pop_back(), sMsg.pop_back(); sMsg += "¡£";
 						sMsg += "½¨ÒéÖØÆô×ÊÔ´¹ÜÀíÆ÷Ó¦ÓÃÒ»Ğ©¹¦ÄÜ£»ÈôÒª»Ö¸´Tab¼ü£¬±ØĞë×¢ÏúÖØĞÂµÇÂ¼¡£";
 						MessageBox(hwnd, sMsg.c_str(), "ËµÃ÷", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
@@ -586,9 +649,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					}
 					Println(sLog);
 					KillProcess(prozsPid, KILL_DEFAULT);
-					KillProcess(GetProcessIDFromName("prozs.exe"), KILL_DEFAULT);
-					KillProcess(GetProcessIDFromName("przs.exe"), KILL_DEFAULT); //ĞÂ°æprozsµÄÃû×Ö
-					KillProcess(GetProcessIDFromName("jfglzs.exe"), KILL_DEFAULT);
+					KillAllProcessWithName("prozs.exe", KILL_DEFAULT);
+					KillAllProcessWithName("przs.exe", KILL_DEFAULT); //ĞÂ°æprozsµÄÃû×Ö
+					KillAllProcessWithName("jfglzs.exe", KILL_DEFAULT);
 					//Í£Ö¹zmserv·şÎñ·ÀÖ¹¹Ø»ú
 					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
 					SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);
@@ -596,7 +659,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					ControlService(zm, SERVICE_CONTROL_STOP, &ss);
 					CloseServiceHandle(sc);
 					CloseServiceHandle(zm);
-					KillProcess(GetProcessIDFromName("zmserv.exe"), KILL_DEFAULT);
+					KillAllProcessWithName("zmserv.exe", KILL_DEFAULT);
 					SetWindowText(TxOut, "Ö´ĞĞ³É¹¦");
 					break;
 				}
@@ -1057,32 +1120,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	SetUnhandledExceptionFilter(GlobalExceptionHandler);
 	//Á´½ÓÎ´µ¼³öAPI
 	InitNTAPI();
-	//ÅĞ¶ÏÊÇ·ñÎªÏµÍ³È¨ÏŞ
-	//https://www.cnblogs.com/idebug/p/11124664.html
-	BOOL bIsLocalSystem = FALSE;
-	PSID psidLocalSystem;
-	SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
-	BOOL fSuccess = AllocateAndInitializeSid(&ntAuthority, 1, SECURITY_LOCAL_SYSTEM_RID,
-	                0, 0, 0, 0, 0, 0, 0, &psidLocalSystem);
-	if (fSuccess) {
-		fSuccess = CheckTokenMembership(0, psidLocalSystem, &bIsLocalSystem);
-		FreeSid(psidLocalSystem);
-	}/*BOOL IsRunAsAdmin() {
-    BOOL isAdmin = FALSE;
-    PSID adminGroupSid = NULL;
-    SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
-
-    if (!AllocateAndInitializeSid(&ntAuthority, 2,
-        SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS,
-        0, 0, 0, 0, 0, 0, &adminGroupSid)) {
-        return FALSE;
-    }
-
-    CheckTokenMembership(NULL, adminGroupSid, &isAdmin);
-    FreeSid(adminGroupSid);
-    return isAdmin;
-}*/
-	//ÒÔSystemÈ¨ÏŞÆô¶¯×ÔÉí
+	//ÅĞ¶Ïµ±Ç°ÔËĞĞÈ¨ÏŞ
+	HANDLE hToken;
+	OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken);
+	DWORD dwLength = 0;
+	GetTokenInformation(hToken, TokenIntegrityLevel, NULL, 0, &dwLength);
+	PTOKEN_MANDATORY_LABEL pTIL = (PTOKEN_MANDATORY_LABEL)LocalAlloc(0, dwLength);
+	if(GetTokenInformation(hToken, TokenIntegrityLevel, pTIL, dwLength, &dwLength)){
+		DWORD dwLevel = *GetSidSubAuthority(pTIL->Label.Sid, *GetSidSubAuthorityCount(pTIL->Label.Sid) - 1);
+		if (dwLevel >= SECURITY_MANDATORY_SYSTEM_RID)
+			eLevel = System;
+		else if (dwLevel >= SECURITY_MANDATORY_HIGH_RID)
+			eLevel = Admin;
+		else
+			eLevel = User;
+	} else eLevel = RunLevel::Unknown;
+	//ÒÔSystemÈ¨ÏŞÆô¶¯×ÔÉí£¬°²È«Ä£Ê½»òUserÈ¨ÏŞ²»ĞĞ
 	//Ïê¼ûhttps://blog.csdn.net/weixin_42112038/article/details/126308315
 	int argc; bool bStartAsSystem = false;
 	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
@@ -1090,7 +1143,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		bStartAsSystem = (!_wcsicmp(argv[1], L"-s") || !_wcsicmp(argv[1], L"/s"));
 		LocalFree(argv);
 	}
-	if (!bIsLocalSystem && bStartAsSystem) {
+	if (eLevel != System && bStartAsSystem) {
 		EnableDebugPrivilege();
 		HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("lsass.exe"));
 		if (!hProcess)hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("winlogon.exe"));
@@ -1391,6 +1444,20 @@ bool KillProcess(DWORD dwProcessID, int way) {
 		return sta;
 	}
 	return false;
+}
+
+bool KillAllProcessWithName(LPCSTR name, int way) {
+	PROCESSENTRY32 pe; bool s = false;
+	pe.dwSize = sizeof(PROCESSENTRY32);
+	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (Process32First(hSnapshot, &pe)) {
+		do {
+			if(!_stricmp(pe.szExeFile, name))
+				s = KillProcess(pe.th32ProcessID, way);
+		} while (Process32Next(hSnapshot, &pe));
+	}
+	CloseHandle(hSnapshot);
+	return s;
 }
 
 //¹ÒÆğ½ø³Ì£¬µ÷ÓÃÎ´¹«¿ªº¯ÊıNtSuspendProcess¡£suspend²ÎÊı¾ö¶¨¹ÒÆğ/»Ö¸´
