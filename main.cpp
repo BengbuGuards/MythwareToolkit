@@ -57,7 +57,7 @@ bool asking = false, ask = false, closingProcess = false;
 DWORD error = -1;//ÓÃÓÚµ÷ÊÔ
 POINT p, pt;
 HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
-LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.3 | Ð¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇë×¢Ã÷¼«Óò¹¤¾ß°ü£©\n\
+LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.4 | Ð¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇë×¢Ã÷¼«Óò¹¤¾ß°ü£©\n\
 ¶îÍâ¹¦ÄÜ£º1. ¿ì½Ý¼üAlt+CË«»÷É±µôµ±Ç°½ø³Ì£¬Alt+W×îÐ¡»¯¶¥²ã´°¿Ú£¬Alt+B»½ÆðÖ÷´°¿Ú\n\
 2. µ±Êó±êÒÆÖÁÆÁÄ»×óÉÏ½Ç/ÓÒÉÏ½ÇÊ±£¬¿ÉÒÔÑ¡Ôñ×îÐ¡»¯/¹Ø±Õ½¹µã´°¿Ú£¨ÄãÒ²¿ÉÒÔ¹Ø±Õ´Ë¹¦ÄÜ£©\n\
 3. ×îÐ¡»¯Ê±Òþ²Øµ½ÈÎÎñÀ¸ÍÐÅÌ£¬×ó¼üË«»÷´ò¿ªÖ÷½çÃæ£¬ÓÒ¼üµ¥»÷µ÷³ö²Ëµ¥\n\
@@ -67,7 +67,7 @@ LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.3 | Ð¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇë×¢Ã÷¼
 7. MeltdownDFCÎª±ùµã»¹Ô­ÃÜÂëÆÆ½â¹¤¾ß£¬crdiskÎªÆäËû±£»¤ÏµÍ³É¾³ý¹¤¾ß£¨É÷ÓÃ£¡£©";
 HANDLE thread/*ÓÃÀ´Ë¢ÐÂÖÃ¶¥£¬ÓÃTimer»áÓÐbug*/, mouHook/*½âÊó±êËø*/, keyHook/*½â¼üÅÌËø*/;
 UINT WM_TASKBAR;
-enum RunLevel {Unknown, User, Admin, System} eLevel;
+enum RunLevel {RL_UNKNOWN, RL_USER, RL_ADMIN, RL_SYSTEM} eLevel;
 struct MW_INFO {
 	HWND hwndOfBoardcast;
 	DWORD pid;
@@ -113,7 +113,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			char szVersion[BUFSIZ] = {};
 			sprintf(szVersion, "ÏµÍ³°æ±¾£º%u.%u.%u %d-bit\n³ÌÐò°æ±¾£º%s %d-bit\n",
 				vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber, (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, 
-				"1.2.3", sizeof(PVOID)*8);
+				"1.2.4", sizeof(PVOID)*8);
 			sOutPut += szVersion;
 			EnableDebugPrivilege();//ÌáÈ¨
 			w = GetSystemMetrics(SM_CXSCREEN) - 1;//ÆÁÄ»¿í¶È£¨×¢Òâ±ÈÊµ¼Ê¿É´ïµ½µÄ×ø±ê¶à1£©
@@ -164,19 +164,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, 0);
 			BtCur = CreateWindow(WC_BUTTON, "½â³ýÊó±êÏÞÖÆ(&M)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 95, 176, 107, 18, hwnd, HMENU(1017), hi, NULL);
 			BtKbh = CreateWindow(WC_BUTTON, "½â¼üÅÌËø(&C)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 213, 176, 85, 18, hwnd, HMENU(1018), hi, NULL);
-			HWND hToolTip = CreateWindowEx(0, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_ALWAYSTIP, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwnd, NULL, hi, NULL);
+			
+			HWND hToolTip = CreateWindowEx(WS_EX_TOPMOST, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwnd, NULL, hi, NULL);
 			TOOLINFO ti = { sizeof(ti) };
 			ti.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
 			ti.hwnd = hwnd;
-			ti.uId = (UINT_PTR)TxLnk;
+			ti.uId = (UINT_PTR)TxOut;
 			switch(eLevel){
-				case User:
+				case RL_USER:
 					ti.lpszText = "ÓÃ»§È¨ÏÞ";
 					break;
-				case Admin:
+				case RL_ADMIN:
 					ti.lpszText = "¹ÜÀíÔ±È¨ÏÞ";
 					break;
-				case System:
+				case RL_SYSTEM:
 					ti.lpszText = "ÏµÍ³È¨ÏÞ";
 					break;
 				default:
@@ -304,8 +305,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 							{"RestrictRun", "³ÌÐòÔËÐÐÏÞÖÆ"},
 							{"NoLogOff", "×¢Ïú"},
 							{"StartMenuLogOff", "¿ªÊ¼²Ëµ¥×¢Ïú°´Å¥"},
-							{"NoTrayContextMenu", "ÈÎÎñÀ¸ÓÒ¼ü²Ëµ¥"}}},
-						{"SOFTWARE\\Policies\\Microsoft\\MMC", {{"RestrictToPermittedSnapins", "Î¢Èí¹ÜÀí¿ØÖÆÌ¨"}}}
+							{"NoTrayContextMenu", "ÈÎÎñÀ¸ÓÒ¼ü²Ëµ¥"},
+							{"Hidden", "Ç¿ÖÆÏÔÊ¾Òþ²ØÎÄ¼þ"}, //ÁíÓÐCurrentVersion\Explorer\Advanced\Hidden¡¢ShowSuperHiddenºÍHideFileExtÈý¸öÑ¡Ïî£¬ÒòÊôÓÚÓÃ»§ÉèÖÃ£¬¿ÉÊÖ¶¯½â½û£¬¶ø²»×÷´¦Àí¡£
+							{"NoFolderOptions", "ÎÄ¼þ¼ÐÑ¡Ïî"}}},
+						{"SOFTWARE\\Policies\\Microsoft\\MMC", {{"RestrictToPermittedSnapins", "Î¢Èí¹ÜÀí¿ØÖÆÌ¨"}}},
+						{"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\Zones\\3", {
+							{"1803", "IEÏÂÔØÏÞÖÆ"},
+							{"2200", "IE ActiveX¿Ø¼þ"}
+						}}
 					};
 					for (auto p:paths){
 						RegOpenKeyEx(HKEY_CURRENT_USER, p.first, 0, KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
@@ -328,6 +335,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					static const std::pair<LPCSTR, LPCSTR> images[] = {
 						{"taskkill.exe","taskkill"},
 						{"ntsd.exe", "ntsd"},
+						{"tasklist.exe","tasklist"},
+						{"sethc.exe","¸¨Öú¹¦ÄÜ¿ì½Ý¼ü£¨sethc.exe£©"},
 						{"sidebar.exe", "Win7×ÀÃæ²àÀ¸"},
 						{"Chess.exe", "Win7ÏóÆå£¨Chess Titans£©"},
 						{"FreeCell.exe", "Win7¿Õµ±½ÓÁú"},
@@ -360,13 +369,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 
 					//ÒªÉ¾µôµÄÏîÄ¿£¨»Ö¸´Ä¬ÈÏ)
 					static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> deletePaths[] = {
-						{"SOFTWARE\\Policies\\Google\\Chrome", {{"AllowDinosaurEasterEgg","Chrome¿ÖÁúÓÎÏ·"}}},
+						{"SOFTWARE\\Policies\\Google\\Chrome", {
+							{"AllowDinosaurEasterEgg", "Chrome¿ÖÁúÓÎÏ·"},
+							{"DownloadRestrictions", "ChromeÏÂÔØÏÞÖÆ"},
+							{"SaveAs", "ChromeÁí´æÎª"},
+							{"DeveloperToolsAvailability", "Chrome¿ª·¢Õß¹¤¾ß"}}},
 						{"SOFTWARE\\Policies\\Microsoft\\Edge", {
 							{"AllowSurfGame", "Edge³åÀËÓÎÏ·"},
 							{"WebWidgetAllowed", "Edge×ÀÃæÀ¸"},
-							{"DisableLockWorkstation", "Ëø¶¨ÕË»§"}}},
+							{"DownloadRestrictions", "EdgeÏÂÔØÏÞÖÆ"},
+							{"SaveAs", "EdgeÁí´æÎª"},
+							{"DeveloperToolsAvailability", "Edge¿ª·¢Õß¹¤¾ß"}}},
+						{"SOFTWARE\\Policies\\Mozilla\\Firefox", {
+							{"DisableDownloads", "FirefoxÏÂÔØÏÞÖÆ1"},
+							{"BlockAboutDownloads", "FirefoxÏÂÔØÏÞÖÆ2"},
+							{"DeveloperToolsAvailability", "Firefox¿ª·¢Õß¹¤¾ß"}
+						}},
 						{"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", {{"AllowMultipleTSSessions","¶àÖÕ¶Ë·þÎñ»á»°"}}},
 						{"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", {{"HideFastUserSwitching","¿ìËÙÓÃ»§ÇÐ»»"}}},
+						{"SOFTWARE\\Policies\\Microsoft\\WindowsStore", {{"RemoveWindowsStore", "WindowsÓ¦ÓÃÉÌµê"}}},
 					};
 					for (auto p:deletePaths){
 						RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
@@ -381,6 +402,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						}
 						RegCloseKey(retKey);
 					}
+					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Policies\\Microsoft\\Internet Explorer\\Restrictions", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+					ret = RegDeleteValue(retKey, "NoBrowserSaveAs");
+					if (ret == ERROR_SUCCESS) {
+						Println("½â½ûIEÁí´æÎª³É¹¦");
+						sMsg += "IEÁí´æÎª¡¢";
+						cStatus = 1;
+					}
+					RegCloseKey(retKey);
 					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
 					ret = RegDeleteValue(retKey, "ShowTaskViewButton");
 					if (ret == ERROR_SUCCESS) {
@@ -410,7 +439,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						char buf[4096];
 						DWORD read;
 						std::string line;
-						while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0) {
+     while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0) {
 							for (DWORD i = 0; i < read; ++i) {
 								if (buf[i] == '\n') {
 									if (line.find("127.0.0.1") != 0 ||
@@ -423,7 +452,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 								else
 									line += buf[i];
 							}
-						}
+						}   
 						if (!line.empty()){
 							if (!line.empty() && (line.find("127.0.0.1") != 0 ||
 												  line.find_first_not_of(" \t") < line.find("127.0.0.1"))) {
@@ -432,9 +461,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						}
 						CloseHandle(hFile);
 						CloseHandle(hTemp);
+						//È¥³ýÏµÍ³+Òþ²Ø+Ö»¶ÁÊôÐÔ²¢Ìæ»»ÎÄ¼þ
+						SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL);
 						DeleteFile(path);
-						MoveFile(tempPath.c_str(), path);
-						if(bHandled){
+						bool bReplaced = MoveFile(tempPath.c_str(), path);
+						if(bHandled && bReplaced){
 							cStatus = 1;
 							sMsg += "²¿·ÖÍøÕ¾ÏÞÖÆ¡¢";
 						}
@@ -552,10 +583,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					int n3 = time.wMonth + time.wDay;
 					int n4, n5, n6;
 					DWORD prozsPid;
-					if (version[0] == '9' && version[2] >= '0' || version[0] == '1' && version[1] == '0'){
-						//ÒÔÏÂÎª9.x¡¢10.x°æ±¾Âß¼­£¨Ä¿Ç°¿ÉÑéÖ¤°æ±¾£º10.1£©
+					if (version[0] == '9' && version[2] >= '0' || version[0] == '1' && version[1] >= '0'){
+						//ÒÔÏÂÎª9.x¡¢10.x¡¢11.x°æ±¾Âß¼­£¨Ä¿Ç°¿ÉÑéÖ¤°æ±¾£º11.06£©
 						//ÐÂ°æÊ¹ÓÃ¹Ì¶¨Ëã·¨£¬µ«ÊÇÒÀÈ»¿ÉÒÔÈ·¶¨ÔÚ[107, 118]·¶Î§ÄÚ
+						//Ä³°æ¿ªÊ¼£¬ÏÂ·½µÄ107±äÎª105£¬µ«ÊÇ¿É±»Ä£ºýÆ¥ÅäÕì²âµ½
 						char name[10] = {};
+						VBMath.m_rndSeed = 327680;
 						VBMath.Randomize(double(time.wMonth * time.wDay));
 						long long n = round(double(VBMath.Rnd()) * 300000.f + 1.f);
 						for(int i = 4; i >= 0; i--){
@@ -579,6 +612,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 										if(!_stricmp(pe.szExeFile, "smss.exe"))goto IL_13A;//ÌØÅÐ£¬ÕâÊÇ¡°Windows »á»°¹ÜÀíÆ÷¡±
 										if(!_stricmp(pe.szExeFile, "sihost.exe"))goto IL_13A;//¡°Shell Infrastructure Host¡±
 										if(!_stricmp(pe.szExeFile, "spoolsv.exe"))goto IL_13A;//¡°ºóÌ¨´¦Àí³ÌÐò×ÓÏµÍ³Ó¦ÓÃ¡±
+										//ÅÐ¶ÏÊÇ·ñ´¦ÓÚ»ú·¿ÖúÊÖ×ÔÎÒ¸´ÖÆÂ·¾¶ÏÂ
+										HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
+										char path[MAX_PATH] = {}; DWORD size;
+										bool bSuccess = QueryFullProcessImageName(hProcess, 0, path, &size);
+										CloseHandle(hProcess);
+										if (bSuccess && _strnicmp(path, "C:\\Program Files", 16))goto IL_13A;
 										sLog += pe.szExeFile;
 										prozsPid = pe.th32ProcessID;
 										break;
@@ -649,9 +688,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					}
 					Println(sLog);
 					KillProcess(prozsPid, KILL_DEFAULT);
+					//×¢Òâ£ºv11¿ªÊ¼£¬»ú·¿¹ÜÀíÖúÊÖ°²×°ÎÄ¼þ¼ÐÖÐµÄÖØÒªÎÄ¼þ£¬È«²¿¼ÓFILE_ATTRIBUTE_SYSTEMºÍFILE_ATTRIBUTE_HIDDENÊôÐÔ£¬ÆäËûÎÄ¼þÓÃÓÚ»ìÏý¡£
 					KillAllProcessWithName("prozs.exe", KILL_DEFAULT);
 					KillAllProcessWithName("przs.exe", KILL_DEFAULT); //ÐÂ°æprozsµÄÃû×Ö
 					KillAllProcessWithName("jfglzs.exe", KILL_DEFAULT);
+					KillAllProcessWithName("jfglzsp.exe", KILL_DEFAULT);//ÐÂ°æjfglzsµÄÃû×Ö
 					//Í£Ö¹zmserv·þÎñ·ÀÖ¹¹Ø»ú
 					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
 					SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);
@@ -695,7 +736,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
 					break;
 				}
-				case 1015: {//TODO: ²ð·ÖÎªÐÂ´°¿Ú
+				case 1015: {//TODO: ²ð·ÖÎªÐÂ´°¿Ú£¬¸ÄÎª¼ÆËãÁÙÊ±ÃÜÂë
 					if (MessageBox(hwnd, "ÄãÊÇ·ñÒª½«Ñ§Éú»ú·¿¹ÜÀíÖúÊÖµÄÃÜÂëÉè³É12345678£¿½ö7.1-9.98°æ±¾ÓÐÐ§£¬¸Ã²Ù×÷²»¿ÉÄæ£¡£¡(¸ß°æ±¾µÄ»ú·¿ÖúÊÖ¿ÉÄÜ»áÀ¶ÆÁ£¬É÷ÖØ£©", "¾¯¸æ", MB_YESNO | MB_ICONWARNING) == IDYES) {
 						std::string c = "8a29cc29f5951530ac69f4";//Ã²ËÆ9.9xÖ®ºóÐÂ°æÊÇ8a29cc29f5951530ac69
 						HKEY retKey;
@@ -1129,12 +1170,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if(GetTokenInformation(hToken, TokenIntegrityLevel, pTIL, dwLength, &dwLength)){
 		DWORD dwLevel = *GetSidSubAuthority(pTIL->Label.Sid, *GetSidSubAuthorityCount(pTIL->Label.Sid) - 1);
 		if (dwLevel >= SECURITY_MANDATORY_SYSTEM_RID)
-			eLevel = System;
+			eLevel = RL_SYSTEM;
 		else if (dwLevel >= SECURITY_MANDATORY_HIGH_RID)
-			eLevel = Admin;
+			eLevel = RL_ADMIN;
 		else
-			eLevel = User;
-	} else eLevel = RunLevel::Unknown;
+			eLevel = RL_USER;
+	} else eLevel = RL_UNKNOWN;
 	//ÒÔSystemÈ¨ÏÞÆô¶¯×ÔÉí£¬°²È«Ä£Ê½»òUserÈ¨ÏÞ²»ÐÐ
 	//Ïê¼ûhttps://blog.csdn.net/weixin_42112038/article/details/126308315
 	int argc; bool bStartAsSystem = false;
@@ -1143,7 +1184,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		bStartAsSystem = (!_wcsicmp(argv[1], L"-s") || !_wcsicmp(argv[1], L"/s"));
 		LocalFree(argv);
 	}
-	if (eLevel != System && bStartAsSystem) {
+	if (eLevel != RL_SYSTEM && bStartAsSystem) {
 		EnableDebugPrivilege();
 		HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("lsass.exe"));
 		if (!hProcess)hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("winlogon.exe"));
