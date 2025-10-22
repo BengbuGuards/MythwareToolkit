@@ -707,7 +707,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				case 1011: {
 					LRESULT check = SendMessage(BtSnp, BM_GETCHECK, 0, 0);
 					if (check == BST_CHECKED)
-						SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+						SetWindowDisplayAffinity(hwnd, WDA_MONITOR);
 					else
 						SetWindowDisplayAffinity(hwnd, WDA_NONE);
 					break;
