@@ -8,6 +8,7 @@
 #include <versionhelpers.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
@@ -23,6 +24,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter);
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
 bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance);
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WindowSelectHookProc(int nCode, WPARAM wParam, LPARAM lParam);
 
 void InitNTAPI();
 LPCSTR RandomWindowTitle();
@@ -56,7 +58,7 @@ int width = 528, height = 250, w, h, mwSts;
 bool asking = false, ask = false, closingProcess = false;
 DWORD error = -1;//ÓÃÓÚµ÷ÊÔ
 POINT p, pt;
-HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
+HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd, BtSelWnd;
 LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.4 | Ð¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇë×¢Ã÷¼«Óò¹¤¾ß°ü£©\n\
 ¶îÍâ¹¦ÄÜ£º1. ¿ì½Ý¼üAlt+CË«»÷É±µôµ±Ç°½ø³Ì£¬Alt+W×îÐ¡»¯¶¥²ã´°¿Ú£¬Alt+B»½ÆðÖ÷´°¿Ú\n\
 2. µ±Êó±êÒÆÖÁÆÁÄ»×óÉÏ½Ç/ÓÒÉÏ½ÇÊ±£¬¿ÉÒÔÑ¡Ôñ×îÐ¡»¯/¹Ø±Õ½¹µã´°¿Ú£¨ÄãÒ²¿ÉÒÔ¹Ø±Õ´Ë¹¦ÄÜ£©\n\
@@ -67,6 +69,11 @@ LPCSTR helpText = "¼«Óò¹¤¾ß°ü v1.2.4 | Ð¡Á÷º¹»Æ¶¹ | ½»Á÷Èº828869154£¨½øÈºÇë×¢Ã÷¼
 7. MeltdownDFCÎª±ùµã»¹Ô­ÃÜÂëÆÆ½â¹¤¾ß£¬crdiskÎªÆäËû±£»¤ÏµÍ³É¾³ý¹¤¾ß£¨É÷ÓÃ£¡£©";
 HANDLE thread/*ÓÃÀ´Ë¢ÐÂÖÃ¶¥£¬ÓÃTimer»áÓÐbug*/, mouHook/*½âÊó±êËø*/, keyHook/*½â¼üÅÌËø*/;
 UINT WM_TASKBAR;
+constexpr UINT WM_SELECT_WINDOW_DONE = WM_APP + 1;
+bool selectingWindowForAffinity = false;
+HHOOK hWindowSelectHook = NULL;
+HCURSOR hPrevCursor = NULL;
+std::vector<HWND> gExcludedFromCapture;
 enum RunLevel {RL_UNKNOWN, RL_USER, RL_ADMIN, RL_SYSTEM} eLevel;
 struct MW_INFO {
 	HWND hwndOfBoardcast;
@@ -160,6 +167,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			BtSnp = CreateWindow(WC_BUTTON, "·ÀÖ¹½ØÆÁ", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX | (IsWindows7OrGreater() ? 0 : WS_DISABLED), 309, 176, 65, 18, hwnd, HMENU(1011), hi, NULL);
 			SendMessage(BtSnp, BM_SETCHECK, BST_CHECKED, 0);
 			SendMessage(hwnd, WM_COMMAND, 1011, 0);
+			BtSelWnd = CreateWindow(WC_BUTTON, "Ñ¡Ôñ´°¿ÚÍ¸Ã÷", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 264, 200, 248, 22, hwnd, HMENU(1021), hi, NULL);
 			BtTop = CreateWindow(WC_BUTTON, "ÖÃ¶¥´Ë´°¿Ú", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 8, 176, 77, 18, hwnd, HMENU(1016), hi, NULL);
 			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, 0);
 			BtCur = CreateWindow(WC_BUTTON, "½â³ýÊó±êÏÞÖÆ(&M)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 95, 176, 107, 18, hwnd, HMENU(1017), hi, NULL);
@@ -707,7 +715,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				case 1011: {
 					LRESULT check = SendMessage(BtSnp, BM_GETCHECK, 0, 0);
 					if (check == BST_CHECKED)
-						SetWindowDisplayAffinity(hwnd, WDA_MONITOR);
+						SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
 					else
 						SetWindowDisplayAffinity(hwnd, WDA_NONE);
 					break;
@@ -717,7 +725,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					ask = check == BST_CHECKED;
 					break;
 				}
-				case 1014: {
+				case 1021: {
+					if (!IsWindows10OrGreater()) {
+						SetWindowText(TxOut, "´Ë¹¦ÄÜÐèÒª Windows 10 ¼°ÒÔÉÏ°æ±¾Ö§³Ö");
+						break;
+					}
+					if (selectingWindowForAffinity) {
+						SetWindowText(TxOut, "ÕýÔÚµÈ´ý´°¿ÚÑ¡Ôñ£¬ÇëÍê³Éµ±Ç°²Ù×÷¡£");
+						break;
+					}
+					hPrevCursor = SetCursor(LoadCursor(NULL, IDC_CROSS));
+					hWindowSelectHook = SetWindowsHookEx(WH_MOUSE_LL, WindowSelectHookProc, GetModuleHandle(NULL), 0);
+					if (!hWindowSelectHook) {
+						SetCursor(hPrevCursor ? hPrevCursor : LoadCursor(NULL, IDC_ARROW));
+						hPrevCursor = NULL;
+						PrtError("°²×°´°¿ÚÑ¡Ôñ¹³×ÓÊ§°Ü", 0);
+						SetWindowText(TxOut, "ÎÞ·¨Æô¶¯´°¿ÚÑ¡Ôñ¡£");
+						break;
+					}
+					selectingWindowForAffinity = true;
+					SetWindowText(TxOut, "ÌáÊ¾£º×ó¼üÑ¡Ôñ´°¿Ú£¬ÓÒ¼üÈ¡Ïû¡£");
+					break;
+				}
+			case 1014: {
 					//ÕÒµ½¹¤¾ßÌõ
 					HWND menuBar = FindWindowEx(hBdCst, NULL, "AfxWnd80u", NULL);
 					/*//ÏÔÊ¾¹¤¾ßÌõ
@@ -957,6 +987,52 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 				}
 			}
 			break;
+		case WM_SELECT_WINDOW_DONE: {
+			if (hWindowSelectHook) {
+				UnhookWindowsHookEx(hWindowSelectHook);
+				hWindowSelectHook = NULL;
+			}
+			SetCursor(hPrevCursor ? hPrevCursor : LoadCursor(NULL, IDC_ARROW));
+			hPrevCursor = NULL;
+			selectingWindowForAffinity = false;
+			if (lParam == 1) {
+				SetWindowText(TxOut, "ÒÑÈ¡Ïû´°¿ÚÑ¡Ôñ¡£");
+				break;
+			}
+			HWND target = HWND(wParam);
+			if (!target || !IsWindow(target)) {
+				SetWindowText(TxOut, "Î´ÕÒµ½ÓÐÐ§µÄÄ¿±ê´°¿Ú¡£");
+				break;
+			}
+			gExcludedFromCapture.erase(std::remove_if(gExcludedFromCapture.begin(), gExcludedFromCapture.end(), [](HWND h) { return !IsWindow(h); }), gExcludedFromCapture.end());
+			char title[256] = {};
+			if (!GetWindowText(target, title, sizeof(title)) || !title[0])
+				lstrcpyn(title, "Î´ÃüÃû´°¿Ú", sizeof(title));
+			auto it = std::find(gExcludedFromCapture.begin(), gExcludedFromCapture.end(), target);
+			char status[256] = {};
+			if (it == gExcludedFromCapture.end()) {
+				if (SetWindowDisplayAffinity(target, WDA_EXCLUDEFROMCAPTURE)) {
+					gExcludedFromCapture.push_back(target);
+					sprintf(status, "ÒÑ½«´°¿Ú[%s]ÉèÖÃÎª½ØÍ¼Í¸Ã÷¡£", title);
+					SetWindowText(TxOut, status);
+					Println(status);
+				} else {
+					PrtError("ÉèÖÃ½ØÍ¼Í¸Ã÷Ê§°Ü¡£", 0);
+					SetWindowText(TxOut, "ÉèÖÃ½ØÍ¼Í¸Ã÷Ê§°Ü¡£");
+				}
+			} else {
+				if (SetWindowDisplayAffinity(target, WDA_NONE)) {
+					gExcludedFromCapture.erase(it);
+					sprintf(status, "ÒÑÈ¡Ïû´°¿Ú[%s]µÄ½ØÍ¼Í¸Ã÷¡£", title);
+					SetWindowText(TxOut, status);
+					Println(status);
+				} else {
+					PrtError("È¡Ïû½ØÍ¼Í¸Ã÷Ê§°Ü¡£", 0);
+					SetWindowText(TxOut, "È¡Ïû½ØÍ¼Í¸Ã÷Ê§°Ü¡£");
+				}
+			}
+			break;
+		}
 		case WM_DESTROY:
 			UnregisterHotKey(hwnd, 0);
 			UnregisterHotKey(hwnd, 1);
@@ -967,6 +1043,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			Shell_NotifyIcon(NIM_DELETE, &icon); //É¾³ýÍÐÅÌÍ¼±ê£¬·ñÔòÖ»ÓÐÊó±ê»®¹ýÍ¼±ê²ÅÏûÊ§
 			UnhookWindowsHookEx(mseHook);
 			UnhookWindowsHookEx(kbdHook);
+			if (hWindowSelectHook) {
+				UnhookWindowsHookEx(hWindowSelectHook);
+				hWindowSelectHook = NULL;
+			}
 			PostQuitMessage(0);
 			break;
 		case WM_ACTIVATE: { // TODO: Ä¿Ç°¿É¹Û²âµ½µÄ±ÀÀ£ÎÊÌâÀ´×Ô´Ë´¦£¬¿ÉÄÜ´æÔÚÄÚ´æ·ÃÎÊÒþ»¼£¬ÐèÒªÅÅ²é
@@ -1321,6 +1401,37 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
 //Ò»ÕÐ´ò¶ÏÈ«²¿µ×²ãhook
 LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	return FALSE;
+}
+
+
+LRESULT CALLBACK WindowSelectHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
+	if (nCode == HC_ACTION && selectingWindowForAffinity) {
+		static HCURSOR hCrossCursor = NULL;
+		if (!hCrossCursor)
+			hCrossCursor = LoadCursor(NULL, IDC_CROSS);
+		PMSLLHOOKSTRUCT pInfo = (PMSLLHOOKSTRUCT)lParam;
+		switch (wParam) {
+			case WM_MOUSEMOVE:
+				SetCursor(hCrossCursor);
+				break;
+			case WM_LBUTTONDOWN:
+			case WM_RBUTTONDOWN:
+				return 1;
+			case WM_LBUTTONUP: {
+				selectingWindowForAffinity = false;
+				HWND target = WindowFromPoint(pInfo->pt);
+				if (target)
+					target = GetAncestor(target, GA_ROOT);
+				PostMessage(hwnd, WM_SELECT_WINDOW_DONE, WPARAM(target), 0);
+				return 1;
+			}
+			case WM_RBUTTONUP:
+				selectingWindowForAffinity = false;
+				PostMessage(hwnd, WM_SELECT_WINDOW_DONE, 0, 1);
+				return 1;
+		}
+	}
+	return CallNextHookEx(hWindowSelectHook, nCode, wParam, lParam);
 }
 
 //----------½çÃæ----------
