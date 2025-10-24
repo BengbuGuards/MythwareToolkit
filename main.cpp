@@ -74,6 +74,10 @@ bool selectingWindowForAffinity = false;
 HHOOK hWindowSelectHook = NULL;
 HCURSOR hPrevCursor = NULL;
 std::vector<HWND> gExcludedFromCapture;
+char tooltipUserLevel[] = "用户权限";
+char tooltipAdminLevel[] = "管理员权限";
+char tooltipSystemLevel[] = "系统权限";
+char tooltipUnknownLevel[] = "权限未知";
 enum RunLevel {RL_UNKNOWN, RL_USER, RL_ADMIN, RL_SYSTEM} eLevel;
 struct MW_INFO {
 	HWND hwndOfBoardcast;
@@ -180,16 +184,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 			ti.uId = (UINT_PTR)TxOut;
 			switch(eLevel){
 				case RL_USER:
-					ti.lpszText = "用户权限";
+					ti.lpszText = tooltipUserLevel;
 					break;
 				case RL_ADMIN:
-					ti.lpszText = "管理员权限";
+					ti.lpszText = tooltipAdminLevel;
 					break;
 				case RL_SYSTEM:
-					ti.lpszText = "系统权限";
+					ti.lpszText = tooltipSystemLevel;
 					break;
 				default:
-					ti.lpszText = "权限未知";
+					ti.lpszText = tooltipUnknownLevel;
 			}
 			SendMessage(hToolTip, TTM_ADDTOOL, 0, (LPARAM)&ti);
 
