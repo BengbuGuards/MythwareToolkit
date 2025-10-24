@@ -25,6 +25,7 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
+          chcp.com 65001
           pacman -Sy --noconfirm make || true
           mkdir -p bin
           mingw32-make clean || true
