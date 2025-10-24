@@ -27,12 +27,13 @@ jobs:
         run: |
           chcp.com 936
           pacman -Sy --noconfirm make || true
-          mkdir -p bin
+          mkdir -p bin release
           mingw32-make clean || true
           mingw32-make
+          cp bin/MythwareToolkit.exe release/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MythwareToolkit-exe
-          path: bin/MythwareToolkit.exe
+          path: release/MythwareToolkit.exe
