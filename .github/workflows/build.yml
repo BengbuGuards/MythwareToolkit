@@ -26,6 +26,7 @@ jobs:
         shell: msys2 {0}
         run: |
           pacman -Sy --noconfirm make || true
+          mkdir -p bin
           mingw32-make clean || true
           mingw32-make
 
