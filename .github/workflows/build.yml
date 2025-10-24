@@ -12,20 +12,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up MSYS2
+      - name: Set up MSYS2 with required toolchain
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
+          release: false
           update: true
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-make
+            base-devel
+            mingw-w64-x86_64-toolchain
 
       - name: Build
         shell: msys2 {0}
         run: |
-          make clean || true
-          make
+          pacman -Sy --noconfirm make || true
+          mingw32-make clean || true
+          mingw32-make
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
