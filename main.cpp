@@ -295,7 +295,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 
 					std::string sMsg = "操作完成。已解禁的项目有：";
 
-					//要置为0的项目
+					//要置为0的项目（HKCU）
 					static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> paths[] = {
 						{"SOFTWARE\\Policies\\Microsoft\\Windows\\System", {{"DisableCMD","命令提示符"}}},
 						{"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", {
@@ -323,6 +323,31 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						for (auto v:p.second){
 							ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
 							if (out){
+								ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+								if (ret == ERROR_SUCCESS) {
+									cStatus = 1;
+									sprintf(outputBuf, "解禁%s成功", v.second);
+									Println(outputBuf);
+									sMsg += v.second; sMsg += "、";
+								}
+							}
+						}
+						RegCloseKey(retKey);
+					}
+
+					//要置为3的项目（HKLM）
+					static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> paths2[] = {
+						{"SYSTEM\\CurrentControlSet\\Services\\usbstor", {{"Start","U盘驱动（当前控制集）"}}},
+						{"SYSTEM\\ControlSet001\\Services\\usbstor", {{"Start","U盘驱动（控制集1）"}}},
+						{"SYSTEM\\ControlSet002\\Services\\usbstor", {{"Start","U盘驱动（控制集2）"}}},
+						{"SYSTEM\\ControlSet003\\Services\\usbstor", {{"Start","U盘驱动（控制集3）"}}},
+					};
+					value = 3;
+					for (auto p:paths2){
+						RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+						for (auto v:p.second){
+							ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
+							if (out == 4){
 								ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
 								if (ret == ERROR_SUCCESS) {
 									cStatus = 1;
@@ -371,7 +396,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						RegCloseKey(retKey);
 					}
 
-					//要删掉的项目（恢复默认)
+					//要删掉的项目（恢复默认，HKLM)
 					static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> deletePaths[] = {
 						{"SOFTWARE\\Policies\\Google\\Chrome", {
 							{"AllowDinosaurEasterEgg", "Chrome恐龙游戏"},
@@ -443,7 +468,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						char buf[4096];
 						DWORD read;
 						std::string line;
-     while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0) {
+						while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0) {
 							for (DWORD i = 0; i < read; ++i) {
 								if (buf[i] == '\n') {
 									if (line.find("127.0.0.1") != 0 ||
@@ -588,7 +613,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					int n4, n5, n6;
 					DWORD prozsPid;
 					if (version[0] == '9' && version[2] >= '0' || version[0] == '1' && version[1] >= '0'){
-						//以下为9.x、10.x、11.x版本逻辑（目前可验证版本：11.06）
+						//以下为9.x、10.x、11.x、12.x版本逻辑（目前可验证版本：12.1）
 						//新版使用固定算法，但是依然可以确定在[107, 118]范围内
 						//某版开始，下方的107变为105，但是可被模糊匹配侦测到
 						char name[10] = {};
@@ -696,8 +721,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					KillAllProcessWithName("prozs.exe", KILL_DEFAULT);
 					KillAllProcessWithName("przs.exe", KILL_DEFAULT); //新版prozs的名字
 					KillAllProcessWithName("jfglzs.exe", KILL_DEFAULT);
-					KillAllProcessWithName("jfglzsn.exe", KILL_DEFAULT);
 					KillAllProcessWithName("jfglzsp.exe", KILL_DEFAULT);//新版jfglzs的名字
+					KillAllProcessWithName("jfglzsn.exe", KILL_DEFAULT);
 					//停止zmserv服务防止关机
 					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
 					SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);
@@ -1387,7 +1412,7 @@ INT_PTR CALLBACK PsdWndProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARAM lP
 			}
 			LPCSTR note = "动态密码计算器-极域工具包\n自9.x版本起，学生机房管理助手新增动态密码，可用于替代普通密码，其每天变化，\
 对于11.06+版本，还与计算机名有关。本计算器用于计算每个版本的临时密码。\n\
-使用方法：确定想要使用密码的日期和计算机名，记录对应版本的密码，在使用时，动态密码的确认按钮在普通密码的确定按钮右侧的空白区域，可以在大概位置多次点击。\n\
+使用方法：自行提前运行，确定想要使用密码的日期和计算机名，记录对应版本的密码，在使用时，动态密码的确认按钮在普通密码的确定按钮右侧的空白区域，可以在大概位置多次点击。\n\
 注意：11.06版本有三个不同时间发布的分支版本，第一个适用11.0x版本密码，第二个有新算法，第三个即为上面显示的与计算机名相关的密码；自12.0版本起，临时密码被移除。。";
 			CreateWindow(WC_STATIC, note, WS_CHILD | WS_VISIBLE,
 						8, yPos + 128, editWidth + labelWidth + 12, 256, hWndDlg, NULL, NULL, NULL);
