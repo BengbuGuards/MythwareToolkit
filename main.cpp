@@ -1,46 +1,9 @@
 #pragma GCC optimize(3) //优化
-#include <windows.h>
-#include <tlhelp32.h>
-#include <winternl.h>
-#include <fltuser.h>
-#include <userenv.h>
-#include <commctrl.h>
-#include <versionhelpers.h>
-#include <string>
-#include <vector>
-#include <cstdlib>
-#include <ctime>
-#include <cmath>
+
+#include "main.h"
+#include "psd.h"
 #undef UNICODE
 #undef _UNICODE
-
-BOOL GetMythwarePasswordFromRegedit(char *str);
-BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
-DWORD WINAPI KeyHookThreadProc(LPVOID lpParameter);
-DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter);
-
-void ShowPsdWnd();
-
-DWORD WINAPI ThreadProc(LPVOID lpParameter);
-BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
-bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance);
-LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
-
-void InitNTAPI();
-LPCSTR RandomWindowTitle();
-BOOL EnableDebugPrivilege();
-DWORD GetProcessIDFromName(LPCSTR szName);
-bool KillProcess(DWORD dwProcessID, int way);
-bool KillAllProcessWithName(LPCSTR name, int way);
-BOOL SuspendProcess(DWORD dwProcessID, BOOL suspend);
-int GetProcessState(DWORD dwProcessID);
-#define KILL_FORCE 1
-#define KILL_DEFAULT 2
-#define Set(dest, source) *(PVOID*)&(dest) = (PVOID)(source) //强行修改不同指针型数据的值
-
-LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
-inline void PrtError(LPCSTR szDes, LRESULT lResult);
-inline LPSTR FormatLogTime();
 
 std::string sOutPut;
 #define Print(text) sOutPut=sOutPut+FormatLogTime()+text
@@ -603,6 +566,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 						SetWindowText(TxOut, "执行失败，可能未安装学生机房管理助手");
 						break;
 					}
+					//停止zmserv服务防止关机
+					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+					SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);
+					SERVICE_STATUS ss = {};
+					ControlService(zm, SERVICE_CONTROL_STOP, &ss);
+					CloseServiceHandle(sc);
+					CloseServiceHandle(zm);
+					KillAllProcessWithName("zmserv.exe", KILL_DEFAULT);
 					std::string sLog = "机房助手版本：";
 					sLog += version;
 					sLog += "\nprozs.exe进程名：";
@@ -613,7 +584,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					int n4, n5, n6;
 					DWORD prozsPid;
 					if (version[0] == '9' && version[2] >= '0' || version[0] == '1' && version[1] >= '0'){
-						//以下为9.x、10.x、11.x、12.x版本逻辑（目前可验证版本：12.1）
+						//以下为9.x、10.x、11.x、12.x版本逻辑（目前可验证版本：12.98）
 						//新版使用固定算法，但是依然可以确定在[107, 118]范围内
 						//某版开始，下方的107变为105，但是可被模糊匹配侦测到
 						char name[10] = {};
@@ -723,14 +694,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 					KillAllProcessWithName("jfglzs.exe", KILL_DEFAULT);
 					KillAllProcessWithName("jfglzsp.exe", KILL_DEFAULT);//新版jfglzs的名字
 					KillAllProcessWithName("jfglzsn.exe", KILL_DEFAULT);
-					//停止zmserv服务防止关机
-					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
-					SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);
-					SERVICE_STATUS ss = {};
-					ControlService(zm, SERVICE_CONTROL_STOP, &ss);
-					CloseServiceHandle(sc);
-					CloseServiceHandle(zm);
-					KillAllProcessWithName("zmserv.exe", KILL_DEFAULT);
 					SetWindowText(TxOut, "执行成功");
 					break;
 				}
@@ -1340,143 +1303,6 @@ LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	return FALSE;
 }
 
-//----------助手----------
-
-void UpdateTempPsd(HWND hwndDlg)
-{
-	if (!IsWindow(hwndDlg))
-		return;
-	CHAR szComputerName[32] = {};
-	GetDlgItemText(hwndDlg, 1002, szComputerName, 32);
-	if(strlen(szComputerName) == 0)strcpy(szComputerName, "X");
-	SYSTEMTIME date = {};
-	SendDlgItemMessage(hwndDlg, 1001, DTM_GETSYSTEMTIME, 0, LPARAM(&date));
-	//10.0-
-	char szPsd[16] = {};
-	int iPsd = 16 * (date.wYear * 91 + date.wMonth * 13 + date.wDay * 57);
-	itoa(iPsd, szPsd + 1, 10);
-	szPsd[0] = '8';
-	SetDlgItemText(hwndDlg, 1003, szPsd);
-	//10.0-11.0
-	itoa(iPsd + 11, szPsd + 1, 10);
-	SetDlgItemText(hwndDlg, 1004, szPsd);
-	//11.00-11.06
-	iPsd = date.wYear * 789 + date.wMonth * 123 + date.wDay * 456 + 111;
-	itoa(iPsd, szPsd, 10);
-	SetDlgItemText(hwndDlg, 1005, szPsd);
-	//11.06+
-	char lastChar = szComputerName[strlen(szComputerName) - 1];
-	iPsd = date.wMonth * 159 + date.wDay * 357 + lastChar * 258;
-	itoa(iPsd, szPsd, 7);
-	SetDlgItemText(hwndDlg, 1006, szPsd);
-}
-
-INT_PTR CALLBACK PsdWndProc(HWND hWndDlg, UINT Message, WPARAM wParam, LPARAM lParam)
-{
-	switch (Message) {
-		case WM_INITDIALOG: {
-			int yPos = 8;
-			int editWidth = 168;
-			int labelWidth = 64;
-			int spacing = 5;
-
-			CreateWindow(WC_STATIC, "日期:", WS_CHILD | WS_VISIBLE,
-						8, yPos, labelWidth, 20, hWndDlg, NULL, NULL, NULL);
-			CreateWindow(DATETIMEPICK_CLASS, "DateTime", WS_CHILD | WS_VISIBLE | WS_TABSTOP | DTS_LONGDATEFORMAT,
-						8 + labelWidth + spacing, yPos, editWidth, 20,
-						hWndDlg, (HMENU)1001, NULL, NULL);
-			yPos += 32;
-
-			DWORD dwSize = MAX_COMPUTERNAME_LENGTH + 1;
-			char szName[dwSize] = {};
-			GetComputerName(szName, &dwSize);
-
-			CreateWindow(WC_STATIC, "计算机名:", WS_CHILD | WS_VISIBLE,
-						8, yPos, labelWidth, 20, hWndDlg, NULL, NULL, NULL);
-			HWND hwndEdit = CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, szName, WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-										8 + labelWidth + spacing, yPos, editWidth, 20,
-										hWndDlg, (HMENU)1002, NULL, NULL);
-			SendMessage(hwndEdit, EM_SETLIMITTEXT, MAX_COMPUTERNAME_LENGTH, 0);
-			yPos += 40;
-
-			CreateWindow(WC_BUTTON, "计算结果", WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
-						4, yPos, editWidth + labelWidth + 14, 128, hWndDlg, NULL, NULL, NULL);
-			constexpr LPCSTR szTitle[4] = {"10.1-", "10.x", "11.0x", "11.06+"};
-			for (int i = 0; i < 4; i++)
-			{
-				CreateWindow(WC_STATIC, szTitle[i], WS_CHILD | WS_VISIBLE,
-							15, yPos + 25 + (i * 25), labelWidth, 20, hWndDlg, NULL, NULL, NULL);
-				CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, "", WS_CHILD | WS_VISIBLE | ES_READONLY | WS_EX_CLIENTEDGE | WS_TABSTOP,
-							15 + labelWidth + spacing - 8, yPos + 25 + (i * 25), editWidth, 20,
-							hWndDlg, (HMENU)(1003 + i), NULL, NULL);
-			}
-			LPCSTR note = "动态密码计算器-极域工具包\n自9.x版本起，学生机房管理助手新增动态密码，可用于替代普通密码，其每天变化，\
-对于11.06+版本，还与计算机名有关。本计算器用于计算每个版本的临时密码。\n\
-使用方法：自行提前运行，确定想要使用密码的日期和计算机名，记录对应版本的密码，在使用时，动态密码的确认按钮在普通密码的确定按钮右侧的空白区域，可以在大概位置多次点击。\n\
-注意：11.06版本有三个不同时间发布的分支版本，第一个适用11.0x版本密码，第二个有新算法，第三个即为上面显示的与计算机名相关的密码；自12.0版本起，临时密码被移除。。";
-			CreateWindow(WC_STATIC, note, WS_CHILD | WS_VISIBLE,
-						8, yPos + 128, editWidth + labelWidth + 12, 256, hWndDlg, NULL, NULL, NULL);
-			EnumChildWindows(hWndDlg, SetWindowFont, LPARAM(hFont));
-			UpdateTempPsd(hWndDlg);
-			return TRUE;
-		}
-		case WM_NOTIFY:
-			if(((LPNMHDR)lParam)->code == DTN_DATETIMECHANGE){
-				UpdateTempPsd(hWndDlg);
-				break;
-			}
-		case WM_NCHITTEST: {
-			UINT nHitTest = DefWindowProc(hWndDlg, WM_NCHITTEST, wParam, lParam);
-			if (nHitTest == HTCLIENT && GetAsyncKeyState(MK_LBUTTON) < 0)
-				nHitTest = HTCAPTION;
-			SetWindowLong(hWndDlg, DWL_MSGRESULT, nHitTest);
-			return nHitTest;
-		}
-		case WM_COMMAND:
-		{
-			switch (LOWORD(wParam))
-			{
-				case 1002:
-					if(HIWORD(wParam) == EN_CHANGE)
-						UpdateTempPsd(hWndDlg);
-					break;
-				case IDOK:
-				case IDCANCEL:
-					EndDialog(hWndDlg, LOWORD(wParam));
-					return TRUE;
-			}
-			break;
-		}
-	}
-	return FALSE;
-}
-
-void ShowPsdWnd()
-{
-	HGLOBAL hgbl = GlobalAlloc(GMEM_ZEROINIT, 1024);
-	if (!hgbl)
-		return;
-	LPDLGTEMPLATE lpdt = (LPDLGTEMPLATE)GlobalLock(hgbl);
-	// Define a dialog box.
-
-	lpdt->style = WS_POPUP | WS_BORDER | WS_SYSMENU | DS_MODALFRAME | WS_CAPTION | DS_CENTER;
-	lpdt->cdit = 0; // Number of controls
-	lpdt->x = 0;
-	lpdt->y = 0;
-	lpdt->cx = 128;
-	lpdt->cy = 220;
-	LPWORD lpw = (LPWORD)(lpdt + 1);
-	*lpw++ = 0; // No menu
-	*lpw++ = 0; // Predefined dialog box class (by default)
-	LPWSTR lpwsz = (LPWSTR)lpw;
-	int nchar = 1 + MultiByteToWideChar(CP_ACP, 0, "密码计算", -1, lpwsz, 50);
-	lpw += nchar;
-	*lpw++ = 0; // No creation data
-
-	GlobalUnlock(hgbl);
-	DialogBoxIndirect(NULL, (LPDLGTEMPLATE)hgbl, hwnd, PsdWndProc);
-	GlobalFree(hgbl);
-}
 //----------界面----------
 
 //https://www.52pojie.cn/thread-542884-1-1.html 有删改 TODO: 尝试FreeModule(libTDMaster.dll)
