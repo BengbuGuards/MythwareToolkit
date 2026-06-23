@@ -1,8 +1,5 @@
 #pragma once
 
-#include <windows.h>
-
-extern HWND hwnd;
-extern HFONT hFont;
+#include "globals.h"
 
 void ShowPsdWnd();
