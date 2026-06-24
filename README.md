@@ -12,6 +12,19 @@
 
 **当前版本：v2.0.0**
 
+```
+MythwareToolkit/
+├── src/          ← 源码（9个 .cpp）
+├── include/      ← 头文件（4个 .h）
+├── res/          ← 资源（图标/图片/manifest/嵌入式exe）
+├── scripts/      ← 编译脚本（build.bat / build_portable.bat / sign.ps1）
+├── cert/         ← 证书 + 部署（deploy.bat / mythware.cer / RootCA.reg）
+├── bin/          ← 编译输出（不入仓）
+├── Makefile
+├── README.md
+└── CHANGELOG.md
+```
+
 ---
 
 ## v2.0.0 新增
@@ -64,22 +77,21 @@
 ### 方式一：build.bat（最简单）
 
 ```batch
-build.bat
+scripts\build.bat          → bin\MythwareToolkit.exe       （UIAccess 完整版，需签名+安装）
+scripts\build_portable.bat → bin\MythwareToolkit_Portable.exe （便携版，免签名免安装）
 ```
 
-自动检测 `D:\Dev\mingw64` / `C:\mingw64` / `C:\msys64\mingw64` / PATH 中的 MinGW64。
+双击即可运行。自动检测 `D:\Dev\mingw64` / `C:\mingw64` / `C:\msys64\mingw64` / PATH 中的 MinGW64。
 
-### 方式二：CMake
+两个版本的区别：
+- **build.bat** — `uiAccess="true"`，超级置顶（覆盖任务管理器），需签名后安装到 `C:\Program Files\`
+- **build_portable.bat** — `uiAccess="false"`，免签名，U盘即插即用，牺牲超级置顶能力
 
-```bash
-cmake -B build -G "MinGW Makefiles"
-cmake --build build
-```
-
-### 方式三：Makefile
+### 方式二：Makefile
 
 ```bash
-mingw32-make
+make          # UIAccess 版
+make portable # 便携版
 ```
 
 ### 依赖
@@ -91,20 +103,35 @@ mingw32-make
 
 ## 部署
 
-exe 需要 `uiAccess="true"`（超级置顶），因此需要数字签名。项目提供签名脚本：
+### UIAccess 完整版
 
-```powershell
-# 在项目目录下以管理员 PowerShell 运行
-.\sign.ps1
+1. 运行 `scripts\build.bat` 编译
+2. 以管理员 PowerShell 运行签名脚本：
+   ```powershell
+   powershell -File scripts\sign.ps1
+   ```
+3. 部署（复制到 Program Files + 安装证书 + 创建快捷方式）：
+   ```batch
+   cert\deploy.bat
+   ```
+
+### 便携版
+
+直接编译 `scripts\build_portable.bat`，输出 `bin\MythwareToolkit_Portable.exe` 可在任意位置双击运行，无需签名和安装。
+
+### 证书安装（解决"从服务器返回了一个参照"弹窗）
+
+如果遇到弹窗报错，导入证书即可：
+
+```batch
+cert\deploy.bat    # 一键部署（推荐）
+:: 或手动导入
+certutil -addstore -f -enterprise Root cert\mythware.cer
+:: 或导入注册表
+cert\RootCA.reg
 ```
 
-签名后复制到 `C:\Program Files\MythwareToolkit\` 即可运行。导出证书 `bin\mythware.cer` 可在其他电脑上导入：
-
-```powershell
-certutil -addstore Root mythware.cer
-```
-
-如果不需要超级置顶（只超越普通窗口，不超越任务管理器），将 `sys.manifest` 中 `uiAccess="true"` 改为 `"false"` 重新编译，exe 可在任意位置直接双击运行。
+以上文件均在 `cert\` 目录下。
 
 ---
 
@@ -188,6 +215,6 @@ public class Program
 
 ### 重要提醒
 
-若出现"从服务器返回了一个参照"弹窗，导入项目中的 `RootCA.reg`（原版证书）或 `mythware.cer`（本版证书）。机房环境建议关闭 UAC。
+若出现"从服务器返回了一个参照"弹窗，导入 `cert\RootCA.reg`（原版证书）或 `cert\mythware.cer`（本版证书），或直接运行 `cert\deploy.bat`。机房环境建议关闭 UAC。
 
 </details>
