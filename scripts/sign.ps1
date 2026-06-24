@@ -1,5 +1,6 @@
 # MythwareToolkit 自签名脚本 (管理员 PowerShell 运行)
 $ErrorActionPreference = "Stop"
+Set-Location "$PSScriptRoot\.."
 $exe = "bin\MythwareToolkit.exe"
 
 if (-not (Test-Path $exe)) {

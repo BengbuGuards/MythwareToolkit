@@ -1,5 +1,5 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0.."
 set TARGET=C:\Program Files\MythwareToolkit
 
 net session >nul 2>&1
@@ -8,10 +8,10 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b
 )
 
-echo [1/3] Create folder...
+echo [1/4] Create folder...
 mkdir "%TARGET%" 2>nul
 
-echo [2/3] Copy exe...
+echo [2/4] Copy exe...
 if exist "bin\MythwareToolkit.exe" (
     copy /Y "bin\MythwareToolkit.exe" "%TARGET%\" >nul
 ) else if exist "MythwareToolkit.exe" (
@@ -21,11 +21,11 @@ if exist "bin\MythwareToolkit.exe" (
     pause & exit /b 1
 )
 
-echo [3/3] Install certificate...
+echo [3/4] Install certificate...
 if exist "bin\MythwareToolkit.cer" (
     certutil -addstore -f -enterprise Root "bin\MythwareToolkit.cer" >nul 2>&1
-) else if exist "MythwareToolkit.cer" (
-    certutil -addstore -f -enterprise Root "MythwareToolkit.cer" >nul 2>&1
+) else if exist "cert\mythware.cer" (
+    certutil -addstore -f -enterprise Root "cert\mythware.cer" >nul 2>&1
 )
 echo    Done
 

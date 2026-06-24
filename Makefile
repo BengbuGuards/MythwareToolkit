@@ -1,40 +1,58 @@
 # Project: MythwareToolkit
+# Build: make          → UIAccess build (needs signing)
+#        make portable → Portable build (no signing, no install)
 
-CXX      = "g++.exe"
-CC       = "gcc.exe"
-WINDRES  = "windres.exe"
+CXX      = g++
+WINDRES  = windres
 RM       = del /q /f
-CD       = cd /d
-LIBS     = "-s" "-mwindows" "C:/Windows/System32/Comctl32.dll" "C:/Windows/System32/FltLib.dll" "-static"
-INCS     = 
-CXXINCS  = 
-CXXFLAGS = $(CXXINCS) "-O3" "-pipe" "-lntdll"
-CFLAGS   = $(INCS) "-O2" "-pipe"
-WINDRESFLAGS = 
-RES      = resource.res
 
-OBJ      = main.o psd.o $(RES)
-BIN      = MythwareToolkit.exe
+# Compiler / linker flags
+CXXFLAGS = -O3 -pipe -lntdll -fexec-charset=UTF-8 -Iinclude
+LFLAGS   = -s -mwindows -lcomctl32 -lole32 -loleaut32 -luuid -static
+LFLAGS_P = -s -mwindows -lcomctl32 -lgdi32 -lgdiplus -lole32 -static
 
-LINKOBJ  = "bin/main.o" "bin/psd.o" "bin/resource.res"
+# Source files
+SRCDIR   = src
+CPPS     = $(SRCDIR)/main.cpp $(SRCDIR)/utils.cpp $(SRCDIR)/process.cpp \
+           $(SRCDIR)/bypass.cpp $(SRCDIR)/assistant.cpp $(SRCDIR)/mythware.cpp \
+           $(SRCDIR)/hooks.cpp $(SRCDIR)/psd.cpp $(SRCDIR)/floating.cpp
 
-CLEANOBJ = "bin/main.o" "bin/psd.o" "bin/resource.res" "bin/MythwareToolkit.exe"
+# Object files
+OUTDIR   = bin
+OBJS     = $(patsubst $(SRCDIR)/%.cpp,$(OUTDIR)/%.o,$(CPPS))
+RES      = $(OUTDIR)/resource.res
+BIN      = $(OUTDIR)/MythwareToolkit.exe
+BIN_P    = $(OUTDIR)/MythwareToolkit_Portable.exe
 
-.PHONY: all all-before all-after clean clean-custom
+.PHONY: all portable clean
 
-all: all-before $(BIN) all-after
+# ── Default: UIAccess build ─────────────────────────────────
+all: $(BIN)
 
-clean: clean-custom
-	-$(RM) $(CLEANOBJ) >NUL 2>&1
+$(BIN): $(OBJS) $(RES)
+	$(CXX) $(OBJS) $(RES) -o $@ $(LFLAGS)
 
-MythwareToolkit.exe: $(OBJ)
-	$(CXX) $(LINKOBJ) -o "bin/MythwareToolkit.exe" $(LIBS)
+# ── Portable build ──────────────────────────────────────────
+portable: res/sys.manifest
+	copy /Y res\sys_portable.manifest res\sys.manifest >nul
+	$(MAKE) BIN=$(BIN_P) LFLAGS="$(LFLAGS_P)" _build_portable
+	copy /Y res\sys_original.manifest res\sys.manifest >nul
 
-main.o: main.cpp main.h psd.h
-	$(CXX) -c "main.cpp" -o "bin/main.o" $(CXXFLAGS)
+_build_portable: $(OBJS) $(RES)
+	$(CXX) $(OBJS) $(RES) -o $(BIN_P) $(LFLAGS_P)
 
-psd.o: psd.cpp psd.h main.h
-	$(CXX) -c "psd.cpp" -o "bin/psd.o" $(CXXFLAGS)
+# ── Resource compilation ────────────────────────────────────
+$(RES): res/resource.rc res/sys.manifest res/app.ico \
+        res/floating.jpg res/MeltdownDFC.exe res/crdisk.exe
+	$(WINDRES) -i res/resource.rc --input-format=rc -o $@ -O coff
 
-resource.res: resource.rc
-	$(WINDRES) -i "resource.rc" --input-format=rc -o "bin/resource.res" -O coff $(WINDRESFLAGS)
+# ── Source compilation ──────────────────────────────────────
+$(OUTDIR)/%.o: $(SRCDIR)/%.cpp include/globals.h
+	@if not exist $(OUTDIR) mkdir $(OUTDIR)
+	$(CXX) -c $< -o $@ $(CXXFLAGS)
+
+# ── Clean ───────────────────────────────────────────────────
+clean:
+	-$(RM) $(subst /,\,$(OUTDIR))\*.o >NUL 2>&1
+	-$(RM) $(subst /,\,$(OUTDIR))\*.res >NUL 2>&1
+	-$(RM) $(subst /,\,$(OUTDIR))\MythwareToolkit*.exe >NUL 2>&1

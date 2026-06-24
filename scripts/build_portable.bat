@@ -1,7 +1,8 @@
 @echo off
+cd /d "%~dp0.."
 setlocal enabledelayedexpansion
 set OUTDIR=bin
-set CFLAGS=-O3 -pipe -lntdll -fexec-charset=UTF-8
+set CFLAGS=-O3 -pipe -lntdll -fexec-charset=UTF-8 -Iinclude
 set LFLAGS=-s -mwindows -lcomctl32 -lgdi32 -lgdiplus -lole32 -static
 
 :: 自动查找 MinGW64
@@ -30,30 +31,30 @@ echo MinGW: %MINGW%
 if not exist %OUTDIR% mkdir %OUTDIR%
 
 :: 用便携版 manifest（uiAccess=false，无需签名）
-copy /Y sys_portable.manifest sys.manifest >nul
+copy /Y res\sys_portable.manifest res\sys.manifest >nul
 
 echo.
 echo === Portable Build (no signature needed) ===
 echo [ 1/11] resource.res
-%WR% -i resource.rc --input-format=rc -o %OUTDIR%\resource.res -O coff || goto :err
+%WR% -i res\resource.rc --input-format=rc -o %OUTDIR%\resource.res -O coff || goto :err
 
-echo [ 2/11] utils.o       & %CXX% -c utils.cpp     -o %OUTDIR%\utils.o     %CFLAGS% || goto :err
-echo [ 3/11] process.o     & %CXX% -c process.cpp   -o %OUTDIR%\process.o   %CFLAGS% || goto :err
-echo [ 4/11] bypass.o      & %CXX% -c bypass.cpp    -o %OUTDIR%\bypass.o    %CFLAGS% || goto :err
-echo [ 5/11] assistant.o   & %CXX% -c assistant.cpp -o %OUTDIR%\assistant.o %CFLAGS% || goto :err
-echo [ 6/11] mythware.o    & %CXX% -c mythware.cpp  -o %OUTDIR%\mythware.o  %CFLAGS% || goto :err
-echo [ 7/11] hooks.o       & %CXX% -c hooks.cpp     -o %OUTDIR%\hooks.o     %CFLAGS% || goto :err
-echo [ 8/11] psd.o         & %CXX% -c psd.cpp       -o %OUTDIR%\psd.o       %CFLAGS% || goto :err
-echo [ 9/11] floating.o    & %CXX% -c floating.cpp  -o %OUTDIR%\floating.o  %CFLAGS% || goto :err
-echo [10/11] main.o        & %CXX% -c main.cpp      -o %OUTDIR%\main.o      %CFLAGS% || goto :err
+echo [ 2/11] utils.o       & %CXX% -c src\utils.cpp     -o %OUTDIR%\utils.o     %CFLAGS% || goto :err
+echo [ 3/11] process.o     & %CXX% -c src\process.cpp   -o %OUTDIR%\process.o   %CFLAGS% || goto :err
+echo [ 4/11] bypass.o      & %CXX% -c src\bypass.cpp    -o %OUTDIR%\bypass.o    %CFLAGS% || goto :err
+echo [ 5/11] assistant.o   & %CXX% -c src\assistant.cpp -o %OUTDIR%\assistant.o %CFLAGS% || goto :err
+echo [ 6/11] mythware.o    & %CXX% -c src\mythware.cpp  -o %OUTDIR%\mythware.o  %CFLAGS% || goto :err
+echo [ 7/11] hooks.o       & %CXX% -c src\hooks.cpp     -o %OUTDIR%\hooks.o     %CFLAGS% || goto :err
+echo [ 8/11] psd.o         & %CXX% -c src\psd.cpp       -o %OUTDIR%\psd.o       %CFLAGS% || goto :err
+echo [ 9/11] floating.o    & %CXX% -c src\floating.cpp  -o %OUTDIR%\floating.o  %CFLAGS% || goto :err
+echo [10/11] main.o        & %CXX% -c src\main.cpp      -o %OUTDIR%\main.o      %CFLAGS% || goto :err
 
 echo [11/11] Linking portable...
 %CXX% %OUTDIR%\main.o %OUTDIR%\utils.o %OUTDIR%\process.o %OUTDIR%\bypass.o %OUTDIR%\assistant.o %OUTDIR%\mythware.o %OUTDIR%\hooks.o %OUTDIR%\psd.o %OUTDIR%\floating.o %OUTDIR%\resource.res -o %OUTDIR%\MythwareToolkit_Portable.exe %LFLAGS% || goto :err
 
 :: 恢复原版 manifest
-copy /Y sys_original.manifest sys.manifest >nul 2>nul
-:: 如果上面失败，恢复 uiAccess=true 的版本
-if not exist sys.manifest copy /Y sys_original.manifest sys.manifest >nul 2>nul
+copy /Y res\sys_original.manifest res\sys.manifest >nul 2>nul
+:: 如��上面失败，恢复 uiAccess=true 的版本
+if not exist res\sys.manifest copy /Y res\sys_original.manifest res\sys.manifest >nul 2>nul
 
 echo.
 echo Build OK: %OUTDIR%\MythwareToolkit_Portable.exe
