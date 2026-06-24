@@ -1,1622 +1,360 @@
-#pragma GCC optimize(3) //”≈ªØ
+#pragma GCC optimize(3)
 
-#include "main.h"
+#include "globals.h"
 #include "psd.h"
+#include "floating.h"
 #undef UNICODE
 #undef _UNICODE
 
-std::string sOutPut;
-#define Print(text) sOutPut=sOutPut+FormatLogTime()+text
-#define Println(text) Print(text); sOutPut+="\r\n"
-#define ge error = GetLastError()
-HHOOK kbdHook, mseHook;
-HWND hwnd, focus; /* A 'HANDLE', hence the H, or a pointer to our window */
-/* This is where all the input to the window goes to */
-LPCSTR MythwareFilename = "StudentMain.exe";//∞—’‚∏ˆ∏ƒ≥…±µƒ±„ø…“‘°∞ºÊ»›°±∏¸∂‡µÁ◊”ΩÃ “
-HWND hBdCst;
-//LONG fullScreenStyle = WS_POPUP | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN, windowingStyle = fullScreenStyle | WS_OVERLAPPEDWINDOW ^ WS_OVERLAPPED;
-NOTIFYICONDATA icon;
-HMENU hMenu;//Õ–≈Ã≤Àµ•
-HFONT hFont;
-int width = 528, height = 250, w, h, mwSts;
-bool asking = false, ask = false, closingProcess = false;
-DWORD error = -1;//”√”⁄µ˜ ‘
-POINT p, pt;
-HWND BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
-LPCSTR helpText = "º´”Úπ§æﬂ∞¸ v1.2.5 | –°¡˜∫πª∆∂π | Ωª¡˜»∫828869154£®Ω¯»∫«Î◊¢√˜º´”Úπ§æﬂ∞¸£©\n\
-∂ÓÕ‚π¶ƒ‹£∫1. øÏΩ›º¸Alt+CÀ´ª˜…±µÙµ±«∞Ω¯≥Ã£¨Alt+W◊Ó–°ªØ∂•≤„¥∞ø⁄£¨Alt+BªΩ∆÷˜¥∞ø⁄\n\
-2. µ± Û±Í“∆÷¡∆¡ƒª◊Û…œΩ«/”“…œΩ« ±£¨ø…“‘—°‘Ò◊Ó–°ªØ/πÿ±’Ωπµ„¥∞ø⁄£®ƒ„“≤ø…“‘πÿ±’¥Àπ¶ƒ‹£©\n\
-3. ◊Ó–°ªØ ±“˛≤ÿµΩ»ŒŒÒ¿∏Õ–≈Ã£¨◊Ûº¸À´ª˜¥Úø™÷˜ΩÁ√Ê£¨”“º¸µ•ª˜µ˜≥ˆ≤Àµ•\n\
-4. Ω‚Ω˚π§æﬂø…Ω‚Ω˚Chrome∫ÕEdgeµƒ–°”Œœ∑£ª»ÙÃ· æ…Ë÷√ ß∞‹£¨ø…ƒ‹ «Œﬁ»®œﬁªÚ÷∏∂®◊¢≤·±Ìº¸÷µ≤ª¥Ê‘⁄£¨‘⁄¥À«Èøˆœ¬£¨Õ®≥£±æ…ÌæÕŒﬁ–ËΩ‚Ω˚\n\
-5. Ω‚º¸≈ÃÀ¯π¶ƒ‹»Áπ˚∂‘Alt+Ctrl+DeleteŒﬁ–ß ±£¨÷ÿ–¬π¥—°º¥ø…£ª∂‘º´”Úµƒ¥Û∂‡ ˝≤Ÿ◊˜∂º÷ª‘⁄2015/2016∞Ê≤‚ ‘Õ®π˝\n\
-6. ∆Ù∂Ø ±∏Ωº”-sªÚ/s√¸¡Ó––ø…“‘System»®œﬁ∆Ù∂Ø\n\
-7. MeltdownDFCŒ™±˘µ„ªπ‘≠√‹¬Î∆∆Ω‚π§æﬂ£¨crdiskŒ™∆‰À˚±£ª§œµÕ≥…æ≥˝π§æﬂ£®…˜”√£°£©";
-HANDLE thread/*”√¿¥À¢–¬÷√∂•£¨”√Timerª·”–bug*/, mouHook/*Ω‚ Û±ÍÀ¯*/, keyHook/*Ω‚º¸≈ÃÀ¯*/;
-UINT WM_TASKBAR;
-enum RunLevel {RL_UNKNOWN, RL_USER, RL_ADMIN, RL_SYSTEM} eLevel;
-struct MW_INFO {
-	HWND hwndOfBoardcast;
-	DWORD pid;
-	bool bNotResponding;
-};
-struct { //÷ÿ–¬ µœ÷VBµƒÀÊª˙ ˝π¶ƒ‹
-	int m_rndSeed = 327680;
-	void Randomize(double Number) {
-		int num = m_rndSeed, num2;
-		unsigned char bytes[sizeof(double)];
-		memcpy(bytes, &Number, sizeof(double));
-		memcpy(&num2, bytes + 4, sizeof(int));
-		num2 = ((num2 & 65535) ^ (num2 >> 16)) << 8;
-		num = (num & -16776961) | num2;
-		m_rndSeed = num;
-	}
-	float Rnd() {
-		return Rnd(1.f);
-	}
-	float Rnd(float Number) {
-		int num = m_rndSeed;
-		if ((double)Number != 0.0) {
-			if ((double)Number < 0.0) {
-				num = *(int*)(&Number);
-				long long num2 = (long long)num & (long long)((unsigned long long)(-1));
-				num = (int)((num2 + (num2 >> 24)) & 16777215L);
-			}
-			num = (int)(((long long)num * 1140671485L + 12820163L) & 16777215L);
-		}
-		m_rndSeed = num;
-		return (float)num / 16777216.f;
-	}
-} VBMath;
+// ÂÖ®Â±ÄÂèòÈáèÂÆö‰πâ
+std::string     sOutPut;
+HHOOK           kbdHook, mseHook;
+HWND            hwnd, focus, hBdCst;
+HWND            BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
+NOTIFYICONDATA  icon;
+HMENU           hMenu;
+HFONT           hFont;
+int             width = 640, height = 380, w, h, mwSts;
+bool            asking = false, ask = false, closingProcess = false;
+DWORD           error = -1;
+POINT           p, pt;
+HANDLE          thread, mouHook, keyHook;
+UINT            WM_TASKBAR;
+RunLevel        eLevel;
+LPCSTR          MythwareFilename = "StudentMain.exe";
+VBRandomEngine  VBMath;
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
-	switch (Message) {
-		case WM_CREATE: {
-			//ªÒ»°œµÕ≥∞Ê±æ∫≈
-			OSVERSIONINFO vi = {sizeof(OSVERSIONINFO)};
-			GetVersionEx(&vi);
-			SYSTEM_INFO si = {};
-			GetNativeSystemInfo(&si);
-			char szVersion[BUFSIZ] = {};
-			sprintf(szVersion, "œµÕ≥∞Ê±æ£∫%u.%u.%u %d-bit\n≥Ã–Ú∞Ê±æ£∫%s %d-bit\n",
-				vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber, (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, 
-				"1.2.5", sizeof(PVOID)*8);
-			sOutPut += szVersion;
-			EnableDebugPrivilege();//Ã·»®
-			w = GetSystemMetrics(SM_CXSCREEN) - 1;//∆¡ƒªøÌ∂»£®◊¢“‚±» µº ø…¥ÔµΩµƒ◊¯±Í∂‡1£©
-			h = GetSystemMetrics(SM_CYSCREEN) - 1;//∆¡ƒª∏ﬂ∂»
-			WM_TASKBAR = RegisterWindowMessage("TaskbarCreated");//»ŒŒÒ¿∏¥¥Ω® ¬º˛
-			thread = CreateThread(NULL, 0, ThreadProc, NULL, 0, NULL);//÷√∂•¥∞ø⁄
-			keyHook = CreateThread(NULL, 0, KeyHookThreadProc, NULL, CREATE_SUSPENDED, NULL);//º¸≈ÃÀ¯
-			mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);// Û±ÍÀ¯
-			SetTimer(hwnd, 1, 1000, NULL); //ºÏ≤‚ Û±Í◊Û…œΩ«
-			SetTimer(hwnd, 2, 2000, NULL); //ºÏ≤‚º´”Ú◊¥Ã¨°¢∏¸–¬±ÍÃ‚
-			RegisterHotKey(hwnd, 0, MOD_ALT, 'C'); //Alt+C+C«ø÷∆Ω· ¯µ±«∞≥Ã–Ú
-			RegisterHotKey(hwnd, 1, MOD_ALT, 'W'); //Alt+W◊Ó–°ªØ∂•≤„¥∞ø⁄
-			if(!RegisterHotKey(hwnd, 2, MOD_ALT, 'B')) //Alt+Bœ‘ æ¥À¥∞ø⁄
-				if(MessageBox(hwnd, "◊¢≤·œµÕ≥º∂»»º¸ Alt+B  ß∞‹£¨”–ø…ƒ‹∏√”¶”√µƒ¡Ì“ª µ¿˝ªπ‘⁄‘À––£¨«Îœ»πÿ±’À¸‘Ÿ÷ÿ–¬∆Ù∂Ø±æ≥Ã–Ú£°∑Ò‘ÚªΩ≥ˆ¥∞ø⁄π¶ƒ‹Ω´ ß–ß£°»Ùµ„ª˜°∞»°œ˚°±‘Ú◊Ë÷π≥Ã–ÚºÃ–¯∆Ù∂Ø", "º´ ”Ú π§ æﬂ ∞¸", MB_OKCANCEL | MB_ICONWARNING)==IDCANCEL){
-					PostQuitMessage(0);
-					return FALSE;
-				}
-			HINSTANCE hi = ((LPCREATESTRUCT) lParam)->hInstance;
-			TxLnk = CreateWindow("SysLink", "º´”Úπ§æﬂ∞¸ <a href=\"https://github.com/BengbuGuards/MythwareToolkit\">GitHub</a>", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 8, 8, 120, 20, hwnd, HMENU(1001), hi, NULL);
-			BtAbt = CreateWindow(WC_BUTTON, "πÿ”⁄/∞Ô÷˙", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 166, 3, 90, 30, hwnd, HMENU(1002), hi, NULL);
-			//ªÒ»°√‹¬Î
-			char str[BUFSIZ] = {};
-			LPCSTR psd;
-			if (!GetMythwarePasswordFromRegedit(str))
-				psd = "ªÒ»°√‹¬Î ß∞‹";
-			else psd = str;
-			CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, psd, WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_READONLY, 8, 36, 248, 20, hwnd, HMENU(1003), hi, NULL);
-			CreateWindow(WC_BUTTON, "…±µÙ—ß…˙ª˙∑øπ‹¿Ì÷˙ ÷", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,  8, 64, 248, 50, hwnd, HMENU(1013), hi, NULL);
-			BtKmw = CreateWindow(WC_BUTTON, "…±µÙº´”Ú", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_SPLITBUTTON, 8, 122, 248, 50, hwnd, HMENU(1004), hi, NULL);
-			TxOut = CreateWindow(STATUSCLASSNAME, "µ»¥˝≤Ÿ◊˜", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, hwnd, HMENU(1005), hi, NULL);
-			int pts[2] = {352, -1};
-			SendMessage(TxOut, SB_SETPARTS, WPARAM(2), LPARAM(pts));
-			CreateWindow(WC_BUTTON, "Ω‚≥˝Ω˚”√π§æﬂ", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 264, 8, 248, 98, hwnd, NULL, hi, NULL);
-			CreateWindow(WC_BUTTON, "“ªº¸Ω‚Ω˚œµÕ≥≥Ã–Ú", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 28, 112, 30, hwnd, HMENU(1007), hi, NULL);
-			CreateWindow(WC_BUTTON, "Ω‚≥˝º´”ÚÕ¯¬Áœﬁ÷∆", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 272, 66, 112, 30, hwnd, HMENU(1008), hi, NULL);
-			CreateWindow(WC_BUTTON, "Ω‚≥˝º´”ÚU≈Ãœﬁ÷∆", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 66, 112, 30, hwnd, HMENU(1009), hi, NULL);
-			CreateWindow(WC_BUTTON, "÷ÿ∆Ù◊ ‘¥π‹¿Ì∆˜", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 28, 112, 30, hwnd, HMENU(1010), hi, NULL);
-			CreateWindow(WC_BUTTON, "π„≤•¥∞ø⁄ªØ", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | WS_DISABLED, 264, 112, 120, 30, hwnd, HMENU(1014), hi, NULL);
-			CreateWindow(WC_BUTTON, "∂ØÃ¨√‹¬Îº∆À„", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 112, 120, 30, hwnd, HMENU(1015), hi, NULL);
-			CreateWindow(WC_BUTTON, "MeltdownDFC", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 264, 150, 120, 22, hwnd, HMENU(1019), hi, NULL);
-			CreateWindow(WC_BUTTON, "crdisk", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, 392, 150, 120, 22, hwnd, HMENU(1020), hi, NULL);
-			
-			BtWnd = CreateWindow(WC_BUTTON, "∆Ù”√ Û±Íº‡≤‚µØ¥∞", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 385, 176, 130, 18, hwnd, HMENU(1012), hi, NULL);
-			BtSnp = CreateWindow(WC_BUTTON, "∑¿÷πΩÿ∆¡", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX | (IsWindows7OrGreater() ? 0 : WS_DISABLED), 309, 176, 65, 18, hwnd, HMENU(1011), hi, NULL);
-			SendMessage(BtSnp, BM_SETCHECK, BST_CHECKED, 0);
-			SendMessage(hwnd, WM_COMMAND, 1011, 0);
-			BtTop = CreateWindow(WC_BUTTON, "÷√∂•¥À¥∞ø⁄", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 8, 176, 77, 18, hwnd, HMENU(1016), hi, NULL);
-			SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, 0);
-			BtCur = CreateWindow(WC_BUTTON, "Ω‚≥˝ Û±Íœﬁ÷∆(&M)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 95, 176, 107, 18, hwnd, HMENU(1017), hi, NULL);
-			BtKbh = CreateWindow(WC_BUTTON, "Ω‚º¸≈ÃÀ¯(&C)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 213, 176, 85, 18, hwnd, HMENU(1018), hi, NULL);
-			
-			HWND hToolTip = CreateWindowEx(WS_EX_TOPMOST, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwnd, NULL, hi, NULL);
-			TOOLINFO ti = { sizeof(ti) };
-			ti.uFlags = TTF_IDISHWND | TTF_SUBCLASS;
-			ti.hwnd = hwnd;
-			ti.uId = (UINT_PTR)TxOut;
-			ti.lpszText = new char[16];
-			switch(eLevel){
-				case RL_USER:
-					strcpy(ti.lpszText, "”√ªß»®œﬁ");
-					break;
-				case RL_ADMIN:
-					strcpy(ti.lpszText, "π‹¿Ì‘±»®œﬁ");
-					break;
-				case RL_SYSTEM:
-					strcpy(ti.lpszText, "œµÕ≥»®œﬁ");
-					break;
-				default:
-					strcpy(ti.lpszText, "»®œﬁŒ¥÷™");
-			}
-			SendMessage(hToolTip, TTM_ADDTOOL, 0, (LPARAM)&ti);
-			delete[] ti.lpszText;
-
-			NONCLIENTMETRICS info;
-			info.cbSize = sizeof(NONCLIENTMETRICS);
-			if (SystemParametersInfo (SPI_GETNONCLIENTMETRICS, 0, &info, 0)) {
-				hFont = CreateFontIndirect ((LOGFONT*)&info.lfMessageFont);
-			}//»°œµÕ≥ƒ¨»œ◊÷ÃÂ
-			EnumChildWindows(hwnd, SetWindowFont, LPARAM(hFont));
-			SetupTrayIcon(hwnd, hi);
-			HMENU sys = GetSystemMenu(hwnd, FALSE);//œµÕ≥≤Àµ•
-			AppendMenu(sys, MF_STRING, 2, "œ‘ æ…œ“ª∏ˆ¥ÌŒÛ(&E)");
-			AppendMenu(sys, MF_STRING, 4, "œ‘ æ≥Ã–Ú»’÷æ(&L)");
-			AppendMenu(sys, MF_STRING, 3, "∆Ù∂Ø»ŒŒÒπ‹¿Ì∆˜(&T)");
-			// EnableMenuItem(sys, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
-			DrawMenuBar(hwnd);
-			focus = GetDlgItem(hwnd, 1013);
-			SetFocus(focus);
-			SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
-			//–∂‘ÿº´”ÚΩ¯≥Ã÷’÷πhook
-			HMODULE hook = NULL;
-			if (sizeof(PVOID) == 8)hook = GetModuleHandle("LibTDProcHook64.dll");
-			else hook = GetModuleHandle("LibTDProcHook32.dll");
-			if (hook)FreeModule(hook);
-			break;
-		}
-		case WM_INITMENU: { //À´ª˜Õº±Íƒ¨»œ◊Ó–°ªØ
-			HMENU sys = GetSystemMenu(hwnd, FALSE);
-			SetMenuDefaultItem(sys, SC_MINIMIZE, 0);
-			break;
-		}
-		case WM_COMMAND: {
-			switch (LOWORD(wParam)) {
-				case 1002: {
-					MessageBox(NULL, helpText, "πÿ”⁄/∞Ô÷˙", MB_OK | MB_ICONINFORMATION);
-					break;
-				}
-				case 1004: {
-					if (mwSts != 2) {
-						if (KillProcess(GetProcessIDFromName(MythwareFilename), KILL_FORCE)) {
-							SetWindowText(TxOut, "÷¥––≥…π¶");
-							Sleep(30);
-							SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
-						} else {
-							ge;
-							SetWindowText(TxOut, "÷¥–– ß∞‹");
-						}
-					} else { //Ωµ»®∆Ù∂Øº´”Ú
-						HKEY retKey;//œ»∂¡»°º´”Ú¬∑æ∂
-						char szPath[MAX_PATH * 2];
-						LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\TopDomain\\e-Learning Class Standard\\1.00", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
-						if (ret != ERROR_SUCCESS) {
-							ge;
-							SetWindowText(TxOut, "∂¡»°¬∑æ∂ ß∞‹");
-							RegCloseKey(retKey);
-							break;
-						}
-						DWORD dataLong = MAX_PATH * 2, type = REG_SZ;
-						ret = RegQueryValueEx(retKey, "TargetDirectory", 0, &type, LPBYTE(szPath), &dataLong);
-						RegCloseKey(retKey);
-
-						if (ret != ERROR_SUCCESS) {
-							ge;
-							SetWindowText(TxOut, "∂¡»°¬∑æ∂ ß∞‹");
-							break;
-						}
-						HWND hwnd = FindWindow("Shell_TrayWnd", NULL);//”–’‚∏ˆ¿‡√˚µƒ¥∞ø⁄“ª∂®¡• Ù”⁄explorer.exe
-						DWORD pid;
-						GetWindowThreadProcessId(hwnd, &pid);//∑¥≤È≥ˆ¥∞ø⁄PID
-						HANDLE handle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
-						if (!handle) {
-							SetWindowText(TxOut, "«Îœ»∆Ù∂Ø◊ ‘¥π‹¿Ì∆˜");
-							break;
-						}
-						HANDLE token;
-						OpenProcessToken(handle, TOKEN_DUPLICATE, &token);//»°µ√token
-						DuplicateTokenEx(token, MAXIMUM_ALLOWED, NULL, SecurityIdentification, TokenPrimary, &token);
-						STARTUPINFO si = {};//±ÿ“™µƒ“ª–©≤Œ ˝......
-						PROCESS_INFORMATION pi = {};
-						si.cb = sizeof(STARTUPINFO);
-						si.dwFlags = STARTF_USESHOWWINDOW;
-						si.wShowWindow = SW_SHOW;
-						BOOL bResult = CreateProcessAsUser(token, strcat(szPath, MythwareFilename), NULL, NULL, NULL,
-						                                   FALSE, CREATE_NEW_PROCESS_GROUP | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi); //∆Ù∂Øº´”Ú
-						if (bResult) {
-							SetWindowText(TxOut, "∆Ù∂Ø≥…π¶");
-							CloseHandle(pi.hProcess);
-							CloseHandle(pi.hThread);
-						} else {
-							ge;
-							SetWindowText(TxOut, "∆Ù∂Ø ß∞‹");
-						}
-
-						CloseHandle(handle);
-						CloseHandle(token);
-						SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
-					}
-					break;
-				}
-				case 1007: {
-					BYTE cStatus = 0;
-					HKEY retKey;
-					LONG ret;
-					DWORD value = 0, out = 0, cb;
-					char szPath[BUFSIZ], outputBuf[BUFSIZ];
-
-					std::string sMsg = "≤Ÿ◊˜ÕÍ≥…°£“—Ω‚Ω˚µƒœÓƒø”–£∫";
-
-					//“™÷√Œ™0µƒœÓƒø£®HKCU£©
-					static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> paths[] = {
-						{"SOFTWARE\\Policies\\Microsoft\\Windows\\System", {{"DisableCMD","√¸¡ÓÃ· æ∑˚"}}},
-						{"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", {
-							{"DisableRegistryTools", "◊¢≤·±Ì±‡º≠∆˜"},
-							{"DisableTaskMgr", "»ŒŒÒπ‹¿Ì∆˜"},
-							{"DisableLockWorkstation", "À¯∂®’Àªß"},
-							{"DisableChangePassword", "–ﬁ∏ƒ√‹¬Î"},
-							{"DisableSwitchUserOption", "«–ªª”√ªß"},}},
-						{"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", {
-							{"NoRun", "Win+R‘À––"},
-							{"RestrictRun", "≥Ã–Ú‘À––œﬁ÷∆"},
-							{"NoLogOff", "◊¢œ˙"},
-							{"StartMenuLogOff", "ø™ º≤Àµ•◊¢œ˙∞¥≈•"},
-							{"NoTrayContextMenu", "»ŒŒÒ¿∏”“º¸≤Àµ•"},
-							{"Hidden", "«ø÷∆œ‘ æ“˛≤ÿŒƒº˛"}, //¡Ì”–CurrentVersion\Explorer\Advanced\Hidden°¢ShowSuperHidden∫ÕHideFileExt»˝∏ˆ—°œÓ£¨“Ú Ù”⁄”√ªß…Ë÷√£¨ø… ÷∂ØΩ‚Ω˚£¨∂¯≤ª◊˜¥¶¿Ì°£
-							{"NoFolderOptions", "Œƒº˛º–—°œÓ"}}},
-						{"SOFTWARE\\Policies\\Microsoft\\MMC", {{"RestrictToPermittedSnapins", "Œ¢»Ìπ‹¿Ìøÿ÷∆Ã®"}}},
-						{"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\Zones\\3", {
-							{"1803", "IEœ¬‘ÿœﬁ÷∆"},
-							{"2200", "IE ActiveXøÿº˛"}
-						}}
-					};
-					for (auto p:paths){
-						RegOpenKeyEx(HKEY_CURRENT_USER, p.first, 0, KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-						for (auto v:p.second){
-							ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
-							if (out){
-								ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-								if (ret == ERROR_SUCCESS) {
-									cStatus = 1;
-									sprintf(outputBuf, "Ω‚Ω˚%s≥…π¶", v.second);
-									Println(outputBuf);
-									sMsg += v.second; sMsg += "°¢";
-								}
-							}
-						}
-						RegCloseKey(retKey);
-					}
-
-					//“™÷√Œ™3µƒœÓƒø£®HKLM£©
-					static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> paths2[] = {
-						{"SYSTEM\\CurrentControlSet\\Services\\usbstor", {{"Start","U≈Ã«˝∂Ø£®µ±«∞øÿ÷∆ºØ£©"}}},
-						{"SYSTEM\\ControlSet001\\Services\\usbstor", {{"Start","U≈Ã«˝∂Ø£®øÿ÷∆ºØ1£©"}}},
-						{"SYSTEM\\ControlSet002\\Services\\usbstor", {{"Start","U≈Ã«˝∂Ø£®øÿ÷∆ºØ2£©"}}},
-						{"SYSTEM\\ControlSet003\\Services\\usbstor", {{"Start","U≈Ã«˝∂Ø£®øÿ÷∆ºØ3£©"}}},
-					};
-					value = 3;
-					for (auto p:paths2){
-						RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-						for (auto v:p.second){
-							ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
-							if (out == 4){
-								ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-								if (ret == ERROR_SUCCESS) {
-									cStatus = 1;
-									sprintf(outputBuf, "Ω‚Ω˚%s≥…π¶", v.second);
-									Println(outputBuf);
-									sMsg += v.second; sMsg += "°¢";
-								}
-							}
-						}
-						RegCloseKey(retKey);
-					}
-
-					//“™…æµÙµƒ”≥œÒΩŸ≥÷œÓƒø
-					static const std::pair<LPCSTR, LPCSTR> images[] = {
-						{"taskkill.exe","taskkill"},
-						{"ntsd.exe", "ntsd"},
-						{"tasklist.exe","tasklist"},
-						{"sethc.exe","∏®÷˙π¶ƒ‹øÏΩ›º¸£®sethc.exe£©"},
-						{"sidebar.exe", "Win7◊¿√Ê≤‡¿∏"},
-						{"Chess.exe", "Win7œÛ∆Â£®Chess Titans£©"},
-						{"FreeCell.exe", "Win7ø’µ±Ω”¡˙"},
-						{"Hearts.exe", "Win7∫Ï–ƒ¥Û’Ω"},
-						{"Minesweeper.exe", "…®¿◊£®Minesweeper.exe£©"},
-						{"PurblePlace.exe", "Win7 Purble Place"},
-						{"Mahjong.exe", "Win7¬ÈΩ´£®Mahjong Titans£©"},
-						{"SpiderSolitaire.exe", "Win7÷©÷Î÷Ω≈∆"},
-						{"bckgzm.exe", "InternetÀ´¬Ω∆Â"},
-						{"chkrzm.exe", "InternetÃ¯∆Â"},
-						{"shvlzm.exe", "Internet∫⁄Ã“Õı"},
-						{"Solitaire.exe", "Win7÷Ω≈∆"},
-						{"winmine.exe", "…®¿◊£®winmine.exe£©"},
-						{"Magnify.exe", "∑≈¥Ûæµ"},
-						{"QQPCTray.exe", "QQPCTray"}
-					};
-					for (std::pair<LPCSTR, LPCSTR> p:images){
-						strcpy(szPath, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\");
-						strcat(szPath, p.first);
-						RegOpenKeyEx(HKEY_LOCAL_MACHINE, szPath, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-						ret = RegDeleteValue(retKey, "debugger");
-						if (ret == ERROR_SUCCESS) {
-							sprintf(outputBuf, "Ω‚Ω˚%s≥…π¶", p.second);
-							Println(outputBuf);
-							sMsg += p.second; sMsg += "°¢";
-							cStatus = 1;
-						}
-						RegCloseKey(retKey);
-					}
-
-					//“™…æµÙµƒœÓƒø£®ª÷∏¥ƒ¨»œ£¨HKLM)
-					static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> deletePaths[] = {
-						{"SOFTWARE\\Policies\\Google\\Chrome", {
-							{"AllowDinosaurEasterEgg", "Chromeø÷¡˙”Œœ∑"},
-							{"DownloadRestrictions", "Chromeœ¬‘ÿœﬁ÷∆"},
-							{"SaveAs", "Chrome¡Ì¥ÊŒ™"},
-							{"DeveloperToolsAvailability", "Chromeø™∑¢’ﬂπ§æﬂ"}}},
-						{"SOFTWARE\\Policies\\Microsoft\\Edge", {
-							{"AllowSurfGame", "Edge≥Â¿À”Œœ∑"},
-							{"WebWidgetAllowed", "Edge◊¿√Ê¿∏"},
-							{"DownloadRestrictions", "Edgeœ¬‘ÿœﬁ÷∆"},
-							{"SaveAs", "Edge¡Ì¥ÊŒ™"},
-							{"DeveloperToolsAvailability", "Edgeø™∑¢’ﬂπ§æﬂ"}}},
-						{"SOFTWARE\\Policies\\Mozilla\\Firefox", {
-							{"DisableDownloads", "Firefoxœ¬‘ÿœﬁ÷∆1"},
-							{"BlockAboutDownloads", "Firefoxœ¬‘ÿœﬁ÷∆2"},
-							{"DeveloperToolsAvailability", "Firefoxø™∑¢’ﬂπ§æﬂ"}
-						}},
-						{"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", {{"AllowMultipleTSSessions","∂‡÷’∂À∑˛ŒÒª·ª∞"}}},
-						{"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", {{"HideFastUserSwitching","øÏÀŸ”√ªß«–ªª"}}},
-						{"SOFTWARE\\Policies\\Microsoft\\WindowsStore", {{"RemoveWindowsStore", "Windows”¶”√…ÃµÍ"}}},
-					};
-					for (auto p:deletePaths){
-						RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-						for (auto v:p.second){
-							ret = RegDeleteValue(retKey, v.first);
-							if (ret == ERROR_SUCCESS) {
-								cStatus = 1;
-								sprintf(outputBuf, "Ω‚Ω˚%s≥…π¶", v.second);
-								Println(outputBuf);
-								sMsg += v.second; sMsg += "°¢";
-							}
-						}
-						RegCloseKey(retKey);
-					}
-					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Policies\\Microsoft\\Internet Explorer\\Restrictions", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					ret = RegDeleteValue(retKey, "NoBrowserSaveAs");
-					if (ret == ERROR_SUCCESS) {
-						Println("Ω‚Ω˚IE¡Ì¥ÊŒ™≥…π¶");
-						sMsg += "IE¡Ì¥ÊŒ™°¢";
-						cStatus = 1;
-					}
-					RegCloseKey(retKey);
-					RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					ret = RegDeleteValue(retKey, "ShowTaskViewButton");
-					if (ret == ERROR_SUCCESS) {
-						Println("Ω‚Ω˚»ŒŒÒ ”Õº∞¥≈•≥…π¶");
-						sMsg += "»ŒŒÒ ”Õº∞¥≈•°¢";
-						cStatus = 1;
-					}
-					RegCloseKey(retKey);
-					RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-					ret = RegDeleteValue(retKey, "Scancode Map");
-					if (ret == ERROR_SUCCESS) {
-						Println("«Â≥˝º¸≈Ã”≥…‰≥…π¶");
-						sMsg += "Tabº¸£®º¸≈Ã÷ÿ”≥…‰£©°¢";
-						cStatus = 1;
-					}
-					RegCloseKey(retKey);
-
-					//«Â≥˝ª˙∑ø÷˙ ÷∂‘ƒ≥–©Õ¯“≥µƒ∑‚…±£®v10.2∆£¨∞¸¿®pokiÕ¯∫Õ∆‰À˚“ª–©Õ¯’æ£©£¨’‚“ª≤ø∑÷ ÷∂ØÕÍ≥…“≤––
-					LPCSTR path = "C:\\Windows\\System32\\drivers\\etc\\hosts";
-					bool bHandled = false;
-					HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL,
-											  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-					std::string tempPath = path + std::string(".tmp");
-					HANDLE hTemp = CreateFile(tempPath.c_str(), GENERIC_WRITE, 0, NULL,
-											  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-					if(hFile != INVALID_HANDLE_VALUE && hTemp != INVALID_HANDLE_VALUE) {
-						char buf[4096];
-						DWORD read;
-						std::string line;
-						while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0) {
-							for (DWORD i = 0; i < read; ++i) {
-								if (buf[i] == '\n') {
-									if (line.find("127.0.0.1") != 0 ||
-										line.find_first_not_of(" \t") < line.find("127.0.0.1")) {
-										line += '\n';
-										WriteFile(hTemp, line.c_str(), line.size(), NULL, NULL);
-									} else bHandled = true;
-									line.clear();
-								}
-								else
-									line += buf[i];
-							}
-						}   
-						if (!line.empty()){
-							if (!line.empty() && (line.find("127.0.0.1") != 0 ||
-												  line.find_first_not_of(" \t") < line.find("127.0.0.1"))) {
-								WriteFile(hTemp, line.c_str(), line.size(), NULL, NULL);
-							} else bHandled = true;
-						}
-						CloseHandle(hFile);
-						CloseHandle(hTemp);
-						//»•≥˝œµÕ≥+“˛≤ÿ+÷ª∂¡ Ù–‘≤¢ÃÊªªŒƒº˛
-						SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL);
-						DeleteFile(path);
-						bool bReplaced = MoveFile(tempPath.c_str(), path);
-						if(bHandled && bReplaced){
-							cStatus = 1;
-							sMsg += "≤ø∑÷Õ¯’æœﬁ÷∆°¢";
-						}
-					}
-					SetWindowText(TxOut, "…Ë÷√≥…π¶");
-					if (cStatus) {
-						sMsg.pop_back(), sMsg.pop_back(); sMsg += "°£";
-						sMsg += "Ω®“È÷ÿ∆Ù◊ ‘¥π‹¿Ì∆˜”¶”√“ª–©π¶ƒ‹£ª»Ù“™ª÷∏¥Tabº¸£¨±ÿ–Î◊¢œ˙÷ÿ–¬µ«¬º°£";
-						MessageBox(hwnd, sMsg.c_str(), "Àµ√˜", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
-					}
-					break;
-				}
-				case 1008: {
-					//TODO: ºÏ—È∂‡÷÷◊¥øˆ
-					//∑¢ÀÕ÷’÷π÷∏¡Ó
-					HANDLE hNetFilter = CreateFile("\\\\.\\TDNetFilter", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-					if(!GetLastError()){
-						DeviceIoControl(hNetFilter, 0x120014, NULL, 0, NULL, 0, NULL, 0);
-						PrtError("Ω‚≥˝Õ¯¬Áœﬁ÷∆£∫∑¢ÀÕ÷’÷π÷∏¡Ó", GetLastError());
-						CloseHandle(hNetFilter);
-					} else PrtError("Ω‚≥˝Õ¯¬Áœﬁ÷∆£∫¥Úø™Õ¯¬Á«˝∂Ø", GetLastError());
-					//…±µÙÕ¯πÿ∑˛ŒÒº∞∆‰ ÿª§Ω¯≥Ã
-					bool bStateM = KillProcess(GetProcessIDFromName("MasterHelper.exe"),KILL_DEFAULT);
-					bool bStateG = KillProcess(GetProcessIDFromName("GATESRV.exe"),KILL_DEFAULT);
-					std::string text = "Ω‚≥˝Õ¯¬Áœﬁ÷∆£∫Õ£÷πœ‡πÿΩ¯≥Ã";
-					Println(text + ((bStateM && bStateG) ? "≥…π¶" : " ß∞‹"));
-					//Õ£÷πÕ¯¬Áπ˝¬À«˝∂Ø
-					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
-					SC_HANDLE hFilt = OpenService(sc, "TDNetFilter", SERVICE_STOP | DELETE);
-					SERVICE_STATUS ss = {};
-					bStateM = ControlService(hFilt, SERVICE_CONTROL_STOP, &ss);
-					DeleteService(hFilt);
-					CloseServiceHandle(sc);
-					CloseServiceHandle(hFilt);
-					text = "Ω‚≥˝Õ¯¬Áœﬁ÷∆£∫Õ£÷πœﬁÕ¯«˝∂Ø";
-					Println(text + (bStateM ? "≥…π¶" : " ß∞‹"));
-					SetWindowText(TxOut, "…Ë÷√ÕÍ≥…");
-					break;
-				}
-				case 1009: {
-					HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
-					int id = MessageBox(hwnd, "«Î—°‘Òπÿ±’USBÀ¯µƒƒ£ Ω£°\n»ÌΩ‚Ω˚£∫œÚπ˝¬À∂Àø⁄∑¢ÀÕÕ£÷π«Î«Û\n”≤Ω‚Ω˚£∫÷±Ω”…æ≥˝π˝¬À«˝∂Ø£¨»ÌΩ‚Ω˚∑Ω∞∏Œﬁ–ß ± π”√£°", "USB Setting", MB_YESNOCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND);
-					UnhookWindowsHookEx(hCBTHook);
-					if (id == IDYES) {//LibTDUsbHook10.dll
-						//¡¨Ω”π˝¬À∂Àø⁄£®TDUsbFilterInit£©
-						HANDLE hPort = NULL;
-						HRESULT hResult = FilterConnectCommunicationPort(L"\\TDFileFilterPort", 0, NULL, 0, NULL, &hPort);
-						if(hResult || hPort <= (HANDLE)0 || GetLastError()){
-							error = hResult & 0x0000FFFF;
-							SetWindowText(TxOut, "…Ë÷√ ß∞‹");
-							break;
-						}
-						//∑¢ÀÕœ˚œ¢£®TDUsbFiltFree£©
-						int lpInBuffer[4] = {8, 0, 0, 0}; // [esp+0h] [ebp-10h] BYREF
-						//memset(&lpInBuffer[1], 0, 12);
-						//lpInBuffer[0] = 8;
-						hResult = FilterSendMessage(hPort, lpInBuffer, 16/*0x10u*/, NULL, 0, NULL);
-						ge;
-						//πÿ±’æ‰±˙£®TDUsbFilterDone£©
-						CloseHandle(hPort);
-						SetWindowText(TxOut, !hResult ? "…Ë÷√ÕÍ≥…" : "…Ë÷√ ß∞‹");
-					} else if (id == IDNO) {
-						SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
-						SC_HANDLE hFilt = OpenService(sc, "TDFileFilter", SERVICE_STOP | DELETE);
-						SERVICE_STATUS ss = {};
-						if(ControlService(hFilt, SERVICE_CONTROL_STOP, &ss))
-							SetWindowText(TxOut, "…Ë÷√≥…π¶");
-						else{
-							ge;
-							SetWindowText(TxOut, "…Ë÷√ ß∞‹");
-						}
-						DeleteService(hFilt);
-						CloseServiceHandle(sc);
-						CloseServiceHandle(hFilt);
-					}
-					break;
-				}
-				case 1010: {
-					HWND hwnd = FindWindow("Shell_TrayWnd", NULL);//”–’‚∏ˆ¿‡√˚µƒ¥∞ø⁄“ª∂®¡• Ù”⁄explorer.exe
-					DWORD pid;
-					GetWindowThreadProcessId(hwnd, &pid);//∑¥≤È≥ˆ¥∞ø⁄PID
-					if (pid == 0 || hwnd == NULL) { //◊ ‘¥π‹¿Ì∆˜√ª‘⁄‘À––
-						WinExec("explorer.exe", SW_SHOW);//œ»÷±Ω”‘À––£¨œµÕ≥ºÏ≤‚µΩexplorer.exe «œµÕ≥»®œﬁª·◊‘∂Ø÷ÿ∆ÙÀ¸“‘Ωµ»®£®∑Ò‘Ú»®œﬁ±ªºÃ≥–£¨≥ˆœ÷∆Ê√ÓŒ Ã‚£©
-						break;
-						//pid = GetProcessIDFromName("explorer.exe");
-					}
-					HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
-					if (TerminateProcess(handle, 2))//ÕÀ≥ˆ¬ÎŒ™2
-						SetWindowText(TxOut, "÷¥––≥…π¶");
-					else {
-						ge;
-						SetWindowText(TxOut, "÷¥–– ß∞‹");
-					}
-					CloseHandle(handle);
-					break;
-				}
-				case 1013: {
-					char version[6] = {};//øº¬«º´∂À÷µ»Á6.9.5
-					HKEY retKey;
-					LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\ZM»Ìº˛π§◊˜ “\\—ß…˙ª˙∑øπ‹¿Ì÷˙ ÷", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
-					DWORD size = sizeof(version);
-					RegQueryValueEx(retKey, "Version", NULL, NULL, (LPBYTE)&version, &size);
-					RegCloseKey(retKey);
-					if (ret != ERROR_SUCCESS) {
-						ge;
-						SetWindowText(TxOut, "÷¥–– ß∞‹£¨ø…ƒ‹Œ¥∞≤◊∞—ß…˙ª˙∑øπ‹¿Ì÷˙ ÷");
-						break;
-					}
-					//Õ£÷πzmserv∑˛ŒÒ∑¿÷ππÿª˙
-					SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
-					SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);
-					SERVICE_STATUS ss = {};
-					ControlService(zm, SERVICE_CONTROL_STOP, &ss);
-					CloseServiceHandle(sc);
-					CloseServiceHandle(zm);
-					KillAllProcessWithName("zmserv.exe", KILL_DEFAULT);
-					std::string sLog = "ª˙∑ø÷˙ ÷∞Ê±æ£∫";
-					sLog += version;
-					sLog += "\nprozs.exeΩ¯≥Ã√˚£∫";
-					//»° ±º‰”√”⁄º∆À„prozs.exeµƒÀÊª˙Ω¯≥Ã√˚
-					SYSTEMTIME time;
-					GetLocalTime(&time);
-					int n3 = time.wMonth + time.wDay;
-					int n4, n5, n6;
-					DWORD prozsPid;
-					if (version[0] == '9' && version[2] >= '0' || version[0] == '1' && version[1] >= '0'){
-						//“‘œ¬Œ™9.x°¢10.x°¢11.x°¢12.x∞Ê±æ¬ﬂº≠£®ƒø«∞ø…—È÷§∞Ê±æ£∫12.98£©
-						//–¬∞Ê π”√πÃ∂®À„∑®£¨µ´ «“¿»ªø…“‘»∑∂®‘⁄[107, 118]∑∂Œßƒ⁄
-						//ƒ≥∞Êø™ º£¨œ¬∑Ωµƒ107±‰Œ™105£¨µ´ «ø…±ªƒ£∫˝∆•≈‰’Ï≤‚µΩ
-						char name[10] = {};
-						VBMath.m_rndSeed = 327680;
-						VBMath.Randomize(double(time.wMonth * time.wDay));
-						long long n = round(double(VBMath.Rnd()) * 300000.f + 1.f);
-						for(int i = 4; i >= 0; i--){
-							name[i] = char(n % 10L + 107L);
-							n /= 10L;
-						}
-						prozsPid = GetProcessIDFromName(strcat(name, ".exe"));
-						if (!prozsPid){
-							PROCESSENTRY32 pe;
-							pe.dwSize = sizeof(PROCESSENTRY32);
-							HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-							if (Process32First(hSnapshot, &pe)) {
-								do {
-									//…∏—°≥§∂»Œ™¥Û”⁄µ»”⁄4£®9.x£©µƒΩ¯≥Ã√˚£®≤ª∞¸∫¨ƒ©Œ≤°∞.exe°±£©
-									size_t uImageLength = strlen(pe.szExeFile);
-									if (uImageLength >= 8) {
-										for (char* n7 = pe.szExeFile; *n7 != '.'; n7++) {
-											//f-v÷Æº‰
-											if (!(*n7 >= 102 && *n7 <= 118))goto IL_13A;
-										}
-										if(!_stricmp(pe.szExeFile, "smss.exe"))goto IL_13A;//Ãÿ≈–£¨’‚ «°∞Windows ª·ª∞π‹¿Ì∆˜°±
-										if(!_stricmp(pe.szExeFile, "sihost.exe"))goto IL_13A;//°∞Shell Infrastructure Host°±
-										if(!_stricmp(pe.szExeFile, "spoolsv.exe"))goto IL_13A;//°∞∫ÛÃ®¥¶¿Ì≥Ã–Ú◊”œµÕ≥”¶”√°±
-										//≈–∂œ «∑Ò¥¶”⁄ª˙∑ø÷˙ ÷◊‘Œ“∏¥÷∆¬∑æ∂œ¬
-										HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
-										char path[MAX_PATH] = {}; DWORD size;
-										bool bSuccess = QueryFullProcessImageName(hProcess, 0, path, &size);
-										CloseHandle(hProcess);
-										if (bSuccess && _strnicmp(path, "C:\\Program Files", 16))goto IL_13A;
-										sLog += pe.szExeFile;
-										prozsPid = pe.th32ProcessID;
-										break;
-									}
-									IL_13A:;
-								} while (Process32Next(hSnapshot, &pe));
-							}
-							CloseHandle(hSnapshot);
-						} else sLog += name;
-					} else if (version[0] == '7' &&version[2] >= '5') {
-						//“‘œ¬Œ™7.5°¢7.8∞Ê±æ¬ﬂº≠
-						PROCESSENTRY32 pe;
-						pe.dwSize = sizeof(PROCESSENTRY32);
-						HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-						if (Process32First(hSnapshot, &pe)) {
-							do {
-								//…∏—°≥§∂»Œ™10£®7.5£©ªÚ¥Û”⁄µ»”⁄4£®7.8£©µƒΩ¯≥Ã√˚£®≤ª∞¸∫¨ƒ©Œ≤°∞.exe°±£©
-								size_t uImageLength = strlen(pe.szExeFile);
-								if ((version[2] == '5')?(uImageLength == 14):(uImageLength >= 8)) {
-									//±È¿˙◊÷∑˚
-									for (char* n7 = pe.szExeFile; *n7 != '.'; n7++) {
-										//∑˚≤ª∑˚∫œd-m÷Æº‰
-										if (!(*n7 >= 100 && *n7 <= 109))goto IL_226;
-									}
-									//æÕ «ƒ„£°
-									sLog += pe.szExeFile;
-									prozsPid = pe.th32ProcessID;
-									break;
-								}
-								IL_226:;
-							} while (Process32Next(hSnapshot, &pe));
-						}
-						CloseHandle(hSnapshot);
-					} else if (version[0] == '7' && version[2] == '4') {
-						//“‘œ¬Œ™7.4∞Ê±æ¬ﬂº≠
-						char c1, c2, c3, c4;
-						n3 = time.wMonth * time.wDay, n4 = n3 % 7, n5 = n3 % 5, n6 = n3 % 3;
-						int n = n3 % 9;
-						if (n3 % 2 == 0)
-							c1 = 108 + n4,  c2 = 75 + n,  c3 = 98 + n5,  c4 = 65 + n6;
-						else
-							c1 = 98 + n,  c2 = 65 + n4,  c3 = 108 + n5,  c4 = 75 + n6;
-						char c[5] = {c1, c2, c3, c4, '\0'};
-						sLog += c;
-						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
-					} else if (version[0] == '7' && version[2] == '2') {
-						char c1, c2, c3, c4;
-						//“‘œ¬Œ™7.2∞Ê±æ¬ﬂº≠
-						n4 = n3 % 7, n5 = n3 % 9, n6 = n3 % 5;
-						if (n3 % 2 != 0)
-							c1 = 103 + n5,  c2 = 111 + n4,  c3 = 107 + n6,  c4 = 48 + n4;
-						else 
-							c1 = 97 + n4,   c2 = 109 + n5,  c3 = 101 + n6,  c4 = 48 + n5;
-						char c[5] = {c1, c2, c3, c4, '\0'};
-						sLog += c;
-						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
-					} else {
-						//“‘œ¬Œ™7.2∞Ê±æ÷Æ«∞µƒ¬ﬂº≠
-						n4 = n3 % 3 + 3, n5 = n3 % 4 + 4;
-						char c[10] = {'p'};
-						if (n3 % 2 != 0)
-							c[1] = n5 + 102, c[2] = n4 + 98;
-						else
-							c[1] = n4 + 99,  c[2] = n5 + 106;
-						sLog += c;
-						sLog += "£® π”√7.2«∞µƒ¬ﬂº≠£©";
-						prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
-					}
-					Println(sLog);
-					KillProcess(prozsPid, KILL_DEFAULT);
-					//◊¢“‚£∫v11ø™ º£¨ª˙∑øπ‹¿Ì÷˙ ÷∞≤◊∞Œƒº˛º–÷–µƒ÷ÿ“™Œƒº˛£¨»´≤øº”FILE_ATTRIBUTE_SYSTEM∫ÕFILE_ATTRIBUTE_HIDDEN Ù–‘£¨∆‰À˚Œƒº˛”√”⁄ªÏœ˝°£
-					KillAllProcessWithName("prozs.exe", KILL_DEFAULT);
-					KillAllProcessWithName("przs.exe", KILL_DEFAULT); //–¬∞Êprozsµƒ√˚◊÷
-					KillAllProcessWithName("jfglzs.exe", KILL_DEFAULT);
-					KillAllProcessWithName("jfglzsp.exe", KILL_DEFAULT);//–¬∞Êjfglzsµƒ√˚◊÷
-					KillAllProcessWithName("jfglzsn.exe", KILL_DEFAULT);
-					SetWindowText(TxOut, "÷¥––≥…π¶");
-					break;
-				}
-				case 1011: {
-					LRESULT check = SendMessage(BtSnp, BM_GETCHECK, 0, 0);
-					if (check == BST_CHECKED)
-						SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
-					else
-						SetWindowDisplayAffinity(hwnd, WDA_NONE);
-					break;
-				}
-				case 1012: {
-					LRESULT check = SendMessage(BtWnd, BM_GETCHECK, 0, 0);
-					ask = check == BST_CHECKED;
-					break;
-				}
-				case 1014: {
-					//’“µΩπ§æﬂÃı
-					HWND menuBar = FindWindowEx(hBdCst, NULL, "AfxWnd80u", NULL);
-					/*//œ‘ æπ§æﬂÃı
-					  ShowWindow(menuBar, SW_SHOWDEFAULT);
-					  SetWindowPos(menuBar, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
-					  //“˛≤ÿπ§æﬂÃı
-					  ShowWindow(menuBar, SW_NORMAL);
-					  SetWindowPos(menuBar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);*/
-					//Ω‚Ω˚»´∆¡∞¥≈•
-					//EnableWindow(GetDlgItem(menuBar, 1004),FALSE);
-					//ƒ£ƒ‚µ„ª˜
-					LONG lStyle = GetWindowLong(hBdCst, GWL_STYLE);
-					BOOL bWindowing = lStyle & (WS_CAPTION | WS_SIZEBOX);
-					PostMessage(hBdCst, WM_COMMAND, MAKEWPARAM(1004, BM_CLICK), 0);
-					SetWindowText(TxOut, bWindowing ? "»´∆¡ªØÕÍ≥…" : "¥∞ø⁄ªØÕÍ≥…");
-					SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
-					break;
-				}
-				case 1015: 
-					ShowPsdWnd();
-				case 1016: {
-					LRESULT check = SendMessage(BtTop, BM_GETCHECK, 0, 0);
-					if (check == BST_CHECKED) {
-						ResumeThread(thread);
-					} else {
-						SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-						SuspendThread(thread);
-					}
-					break;
-				}
-				case 1017: {
-					LRESULT check = SendMessage(BtCur, BM_GETCHECK, 0, 0);
-					if (check == BST_CHECKED) {
-						ResumeThread(mouHook);
-					} else {
-						SuspendThread(mouHook);
-						UnhookWindowsHookEx(mseHook);
-					}
-					break;
-				}
-				case 1018: {
-					LRESULT check = SendMessage(BtKbh, BM_GETCHECK, 0, 0);
-					if (check == BST_CHECKED) {
-						ResumeThread(keyHook);
-						//¥Úø™∑˚∫≈¡¥Ω”
-						HANDLE hDevice = CreateFile("\\\\.\\TDKeybd", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-						if (GetLastError()) {
-							PrtError(GetLastError() == ERROR_FILE_NOT_FOUND ? "Ω‚«˝∂Øº¸≈ÃÀ¯£∫«˝∂ØŒ¥∞≤◊∞" : "Ω‚«˝∂Øº¸≈ÃÀ¯£∫…Ë÷√ ß∞‹", GetLastError());
-							break;
-						}
-						BOOL bEnable = TRUE;
-						//∑¢ÀÕøÿ÷∆¥˙¬Î
-						if (DeviceIoControl(hDevice, 0x220000, &bEnable, 4, NULL, 0, NULL, NULL))
-							Print("Ω‚«˝∂Øº¸≈ÃÀ¯£∫…Ë÷√≥…π¶");
-						else
-							PrtError("Ω‚«˝∂Øº¸≈ÃÀ¯£∫…Ë÷√ ß∞‹",GetLastError());
-						CloseHandle(hDevice);
-					} else {
-						SuspendThread(keyHook);
-						UnhookWindowsHookEx(kbdHook);
-					}
-					break;
-				}
-				case 1019: {
-					//≈–∂œ «∑Ò“—‘⁄‘À––
-					DWORD dwPID = GetProcessIDFromName("MeltdownDFC.exe");
-					if(dwPID) break;
-					//»°ª∫¥Ê¬∑æ∂£¨¥¥Ω®Œƒº˛
-					char szTempPath[MAX_PATH];
-					GetTempPath(MAX_PATH, szTempPath);
-					HANDLE hFile = CreateFile(strcat(szTempPath, "\\MeltdownDFC.exe"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
-					if(hFile != INVALID_HANDLE_VALUE){
-						//ªÒ»°◊ ‘¥–≈œ¢
-						HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(2), RT_RCDATA);
-						HGLOBAL hResData = LoadResource(NULL, hResInfo);
-						DWORD dwSize = SizeofResource(NULL, hResInfo);
-						LPVOID pData = LockResource(hResData);
-						if(pData){
-							//–¥»ÎŒƒº˛
-							if(!WriteFile(hFile, pData, dwSize + 1, NULL, NULL)){
-								SetWindowText(TxOut, "–¥»Î ß∞‹");
-								CloseHandle(hFile);
-								break;
-							}
-							FlushFileBuffers(hFile);
-							CloseHandle(hFile);
-							//÷¥––≥Ã–Ú
-							if(WinExec(szTempPath, SW_SHOW) < 32)
-								SetWindowText(TxOut, "∆Ù∂Ø ß∞‹");
-							else SetWindowText(TxOut, "∆Ù∂ØÕÍ≥…");
-						} else SetWindowText(TxOut, "–¥»Î ß∞‹");
-					} else SetWindowText(TxOut, "∆Ù∂Ø ß∞‹");
-					break;
-				}
-				case 1020: {
-					//Õ¨…œ
-					DWORD dwPID = GetProcessIDFromName("crdisk.exe");
-					if(dwPID) break;
-					char szTempPath[MAX_PATH];
-					GetTempPath(MAX_PATH, szTempPath);
-					HANDLE hFile = CreateFile(strcat(szTempPath, "\\crdisk.exe"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
-					if(hFile != INVALID_HANDLE_VALUE){
-						HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(3), RT_RCDATA);
-						HGLOBAL hResData = LoadResource(NULL, hResInfo);
-						DWORD dwSize = SizeofResource(NULL, hResInfo);
-						LPVOID pData = LockResource(hResData);
-						if(pData){
-							if(!WriteFile(hFile, pData, dwSize + 1, NULL, NULL)){
-								SetWindowText(TxOut, "–¥»Î ß∞‹");
-								CloseHandle(hFile);
-								break;
-							}
-							FlushFileBuffers(hFile);
-							CloseHandle(hFile);
-							if(WinExec(szTempPath, SW_SHOW) < 32)
-								SetWindowText(TxOut, "∆Ù∂Ø ß∞‹");
-							else SetWindowText(TxOut, "∆Ù∂ØÕÍ≥…");
-						} else SetWindowText(TxOut, "–¥»Î ß∞‹");
-					} else SetWindowText(TxOut, "∆Ù∂Ø ß∞‹");
-					break;
-				}
-			}
-			return 0;
-		}
-		case WM_HOTKEY:
-			switch (wParam) {
-				case 0://Alt+C
-					if (closingProcess) { //µ⁄∂˛¥Œ
-						closingProcess = false;
-						KillTimer(hwnd, 3);
-						HWND topHwnd = GetForegroundWindow();
-						DWORD pid;
-						GetWindowThreadProcessId(topHwnd, &pid);
-						if(pid != GetCurrentProcessId())//±‹√‚Ωπµ„‘⁄µ±«∞≥Ã–Ú ±£¨πÿ±’◊‘º∫
-							KillProcess(pid, KILL_FORCE);
-					} else { //µ⁄“ª¥Œ
-						closingProcess = true;
-						SetTimer(hwnd, 3, GetDoubleClickTime(), NULL); //ƒ¨»œ”¶∏√ «500ms
-					}
-					break;
-				case 1: { //Alt+W
-					HWND topHwnd = GetForegroundWindow();
-					if(!IsHungAppWindow(topHwnd))//”¶”√≥Ã–ÚŒﬁœÏ”¶ ±≤ª◊˜¥¶¿Ì°£∑¿÷π π◊‘º∫∂¬»˚£¨µº÷¬ŒﬁœÏ”¶°£
-						ShowWindow(topHwnd, SW_MINIMIZE);
-					break;
-				}
-				case 2://Alt+B
-					ShowWindow(hwnd, SW_SHOWNORMAL);
-					SetForegroundWindow(hwnd);
-			}
-			return 0;
-		case WM_TIMER:
-			switch (wParam) {
-				case 1:
-					if (!asking && ask) {
-						//ºÏ≤‚ Û±Í◊Û…œΩ« ¬º˛
-						GetCursorPos(&p);
-						if (p.x == 0 && p.y == 0) {
-							asking = true;
-							HWND topHwnd = GetForegroundWindow();
-							if (MessageBox(hwnd, "ºÏ≤‚µΩ¡À Û±ÍŒª÷√±‰ªØ£° «∑Ò◊Ó–°ªØΩπµ„¥∞ø⁄£ø", " µ ±º‡≤‚", MB_YESNO | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST) == IDYES) {
-								if(!IsHungAppWindow(topHwnd))//Õ¨…œ
-									ShowWindow(topHwnd, SW_MINIMIZE);
-							}
-							asking = false;
-						} else if (p.x == w && p.y == 0) {
-							asking = true;
-							HWND topHwnd = GetForegroundWindow();
-							HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
-							int id = MessageBox(hwnd, "ºÏ≤‚µΩ¡À Û±ÍŒª÷√±‰ªØ£° «∑Òπÿ±’Ωπµ„¥∞ø⁄£ø", " µ ±º‡≤‚", MB_YESNOCANCEL | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST);
-							UnhookWindowsHookEx(hCBTHook);
-							if (id == IDYES) {
-								PostMessage(topHwnd, WM_CLOSE, 0, 0); //“Ï≤Ω
-							} else if (id == IDNO) {
-								//¥¥Ω®“ª∏ˆÕ∏√˜¡„¥Û–°µƒ∏∏¥∞ø⁄
-								HWND hParent = CreateWindowEx(0, WC_STATIC, "", 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL);
-								//Ω´ƒø±Í¥∞ø⁄…ËŒ™◊”¥∞ø⁄
-								SetParent(topHwnd, hParent);
-								ge;
-								//πÿ±’∏∏¥∞ø⁄£¨◊”¥∞ø⁄“≤Ω´“ª≤¢œ˙ªŸ
-								PostMessage(hParent, WM_CLOSE, 0, 0);
-							}
-							asking = false;
-						}
-						break;
-					}
-				case 2: {
-					SetWindowText(hwnd, RandomWindowTitle());
-					DWORD id = GetProcessIDFromName(MythwareFilename);
-					if (id == 0) {
-						SendMessage(TxOut, SB_SETTEXT, 1, LPARAM("º´”ÚŒ¥‘À––"));
-						mwSts = 2;
-						SetWindowText(BtKmw, "∆Ù∂Øº´”Ú");
-					} else {
-						//≈–∂œπ„≤•◊¥Ã¨£¨À≥±„≈–∂œº´”Ú «∑ÒŒﬁœÏ”¶
-						MW_INFO info = {}; info.pid = id;
-						BOOL bWindowing = FALSE;
-						EnumWindows(EnumWindowsProc, LPARAM(&info));
-						hBdCst = info.hwndOfBoardcast;
-						if (hBdCst) {
-							LONG lStyle = GetWindowLong(hBdCst, GWL_STYLE);
-							if (lStyle & WS_SYSMENU)bWindowing = TRUE;
-						}
-						EnableWindow(GetDlgItem(hwnd, 1014), hBdCst ? TRUE : FALSE);
-						SetDlgItemText(hwnd, 1014, bWindowing ? "π„≤•»´∆¡ªØ" : "π„≤•¥∞ø⁄ªØ");
-						//º´”Ú◊¥Ã¨
-						mwSts = GetProcessState(id);
-						std::string show;
-						if (mwSts == -1)show = "º´”Ú◊¥Ã¨Œ¥÷™";
-						else if (mwSts == 0 && !info.bNotResponding)show = "º´”Ú‘À––÷–";
-						else if (mwSts == 0 && info.bNotResponding)show = "º´”ÚŒﬁœÏ”¶";
-						else if (mwSts == 1)show = "º´”Ú“—π“∆";
-						sprintf(show.data(), "%s[PID:%d]", show.c_str(), int(id));
-						SendMessage(TxOut, SB_SETTEXT, 1, LPARAM(show.c_str()));
-						SetWindowText(BtKmw, "…±µÙº´”Ú");
-					}
-					break;
-				}
-				case 3: {
-					closingProcess = false;
-					KillTimer(hwnd, 3);//¡¢øÃΩ‚≥˝
-				}
-			}
-			break;
-		case WM_DESTROY:
-			UnregisterHotKey(hwnd, 0);
-			UnregisterHotKey(hwnd, 1);
-			UnregisterHotKey(hwnd, 2);
-			CloseHandle(thread);
-			CloseHandle(keyHook);
-			CloseHandle(mouHook);
-			Shell_NotifyIcon(NIM_DELETE, &icon); //…æ≥˝Õ–≈ÃÕº±Í£¨∑Ò‘Ú÷ª”– Û±ÍªÆπ˝Õº±Í≤≈œ˚ ß
-			UnhookWindowsHookEx(mseHook);
-			UnhookWindowsHookEx(kbdHook);
-			PostQuitMessage(0);
-			break;
-		case WM_ACTIVATE: { // TODO: ƒø«∞ø…π€≤‚µΩµƒ±¿¿£Œ Ã‚¿¥◊‘¥À¥¶£¨ø…ƒ‹¥Ê‘⁄ƒ⁄¥Ê∑√Œ “˛ªº£¨–Ë“™≈≈≤È
-			if (LOWORD(wParam) == WA_INACTIVE) {
-				if (GetWindowLong(hwnd, GWL_STYLE) & WS_VISIBLE) {
-					focus = GetFocus();
-					char c[10] = {};
-					if (GetClassName(focus, c, 7) && _stricmp(c, "Button") == 0) {
-						LONG style = GetWindowLong(focus, GWL_STYLE);
-						if ((style & BS_AUTOCHECKBOX) != BS_AUTOCHECKBOX)
-							SendMessage(focus, BM_SETSTYLE, 0, TRUE);
-					}
-				}
-			} else {
-				SetFocus(focus);
-				char c[10] = {};
-				if (GetClassName(focus, c, 7) && _stricmp(c, "Button") == 0) {
-					LONG style = GetWindowLong(focus, GWL_STYLE);
-					if ((style & BS_AUTOCHECKBOX) != BS_AUTOCHECKBOX)
-						SendMessage(focus, BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE);
-				}
-			}
-			return FALSE;
-		}
-		case WM_USER + 3:
-			if (lParam == WM_LBUTTONDBLCLK) { //◊Ûº¸À´ª˜
-				ShowWindow(hwnd, SW_SHOWNORMAL);
-				SetForegroundWindow(hwnd);
-			} else if (lParam == WM_RBUTTONUP) { //”“º¸µ•ª˜
-				GetCursorPos(&pt);
-				SetForegroundWindow(hwnd);
-				HMENU hMenu = CreatePopupMenu();//Õ–≈Ã≤Àµ•
-				AppendMenu(hMenu, MF_STRING, 1, "πÿ±’≥Ã–Ú");
-				AppendMenu(hMenu, MF_STRING, 2, "¥Úø™ΩÁ√Ê");
-				int i = TrackPopupMenu(hMenu, TPM_RETURNCMD, pt.x, pt.y, 0, hwnd, NULL);
-				switch (i) {
-					case 1:
-						//TODO
-						PostMessage(hwnd, WM_CLOSE, 0, 0);
-						break;
-					case 2:
-						ShowWindow(hwnd, SW_SHOWNORMAL);
-						SetForegroundWindow(hwnd);
-						break;
-				}
-			}
-			return FALSE;
-		case WM_NOTIFY:
-			switch (((LPNMHDR)lParam)->code) {
-				case BCN_DROPDOWN: {
-					NMBCDROPDOWN* pDropDown = (NMBCDROPDOWN*)lParam;
-					if (pDropDown->hdr.hwndFrom == BtKmw) {
-						// Get screen coordinates of the button.
-						POINT pt;
-						pt.x = pDropDown->rcButton.left;
-						pt.y = pDropDown->rcButton.bottom;
-						ClientToScreen(pDropDown->hdr.hwndFrom, &pt);
-						// Create a menu and add items.
-						HMENU hSplitMenu = CreatePopupMenu();
-						LPCSTR show;
-						if (mwSts != 1)show = "π“∆º´”Ú";
-						else if (mwSts == 1)show = "ª÷∏¥º´”Ú";
-						AppendMenu(hSplitMenu, MF_BYPOSITION, 1, show);
-						EnableMenuItem(hSplitMenu, 1, mwSts != 2 ? MF_ENABLED : MF_GRAYED);
-						// Display the menu.
-						SuspendThread(thread);
-						int i = TrackPopupMenu(hSplitMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, pt.x, pt.y, 0, hwnd, NULL);
-						ResumeThread(thread);
-						switch (i) {
-							case 1: {
-								BOOL sts = SuspendProcess(GetProcessIDFromName(MythwareFilename), !mwSts);
-								if (sts)SetWindowText(TxOut, "π“∆/ª÷∏¥≥…π¶");
-								else SetWindowText(TxOut, "π“∆/ª÷∏¥ ß∞‹");
-								SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
-								break;
-							}
-						}
-						return TRUE;
-					}
-					break;
-				}
-				case NM_CLICK:
-					if (((LPNMHDR)lParam)->hwndFrom == TxOut) {
-						focus = GetFocus();
-						char c[7];
-						GetClassName(focus, c, 7);
-						if (_stricmp(c, "Button") == 0) {
-							LONG style = GetWindowLong(focus, GWL_STYLE);
-							if ((style & BS_AUTOCHECKBOX) != BS_AUTOCHECKBOX)
-								SendMessage(focus, BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE);
-						}
-						break;//±‹√‚µ„ª˜ ‰≥ˆ¿∏∑¢…˙“Ï≥£
-					}
-				case NM_RETURN: {
-					PNMLINK pNMLink = (PNMLINK)lParam;
-					LITEM   item    = pNMLink->item;
-					if ((((LPNMHDR)lParam)->hwndFrom == TxLnk) && (item.iLink == 0))
-						ShellExecuteW(NULL, L"open", item.szUrl, NULL, NULL, SW_SHOW);
-					break;
-				}
-			}
-			break;
-		case WM_NCHITTEST: {// µœ÷ø’∞◊¥¶ÀÊ“‚Õœ∂Ø
-			UINT nHitTest = DefWindowProc(hwnd, WM_NCHITTEST, wParam, lParam);
-			if (nHitTest == HTCLIENT && GetAsyncKeyState(MK_LBUTTON) < 0) // »Áπ˚ Û±Í◊Ûº¸∞¥œ¬£¨GetAsyncKeyState∫Ø ˝µƒ∑µªÿ÷µ–°”⁄0
-				nHitTest = HTCAPTION;
-			return nHitTest;
-		}
-		case WM_SYSCOMMAND:
-			switch (wParam) {
-				case 2: {
-					if (error == -1)error = GetLastError();
-					LPSTR szError = NULL;
-					FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-					              NULL, error, 0, (PTSTR)&szError, 0, NULL);
-					char s[BUFSIZ] = {};
-					sprintf(s, "GetLastError…œ“ª∏ˆ¥ÌŒÛ£∫\n%u£∫%s", error, szError);
-					LocalFree(HLOCAL(szError));
-					MessageBox(hwnd, s, "…œ“ª∏ˆ¥ÌŒÛ", MB_OK | MB_ICONINFORMATION);
-					error = -1;
-					break;
-				}
-				case 3: {//∆Ù∂Ø»ŒŒÒπ‹¿Ì∆˜£¨win10∞Ê±æø…“‘÷√∂•
-					//≈–∂œ”–√ª”–∆Ù∂Ø
-					HWND h = FindWindow("TaskManagerWindow", NULL);
-					BYTE nCount = 0;
-					if (!h) {
-						//»Áπ˚ªπ√ª”–æÕœ»∆Ù∂Ø
-						DWORD value = 0; HKEY retKey;
-						RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-						RegSetValueEx(retKey, "DisableTaskMgr", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-						RegFlushKey(retKey);
-						RegCloseKey(retKey);
-						WinExec("taskmgr", SW_SHOW);
-						ge;
-						do {
-							//◊Ó∂‡µ»¥˝3√Î£¨∑Ò‘ÚÕ£÷πÀ——∞£¨∑¿÷πŒﬁœÏ”¶£®5√Î£©
-							if (++nCount == 60) {
-								SetWindowText(TxOut, "∆Ù∂Ø ß∞‹");
-								return FALSE;
-							}
-							//µ»¥˝¥∞ø⁄¥¥Ω®ÕÍ≥…
-							Sleep(50);
-							h = FindWindow("TaskManagerWindow", NULL);
-						} while (!h);
-					}
-					//ªÒ»°≤Àµ•£¨»°µ√π¥—°◊¥Ã¨
-					HMENU hm = GetMenu(h);
-					MENUITEMINFO mii = {sizeof(MENUITEMINFO), MIIM_STATE};
-					GetMenuItemInfo(hm, 0x7704, FALSE, &mii);
-					//»Áπ˚Œ¥π¥—°æÕƒ£ƒ‚π¥—°
-					if (!(mii.fState & MFS_CHECKED))
-						PostMessage(h, WM_COMMAND, 0x7704, 0);
-					SetWindowText(TxOut, "∆Ù∂ØÕÍ≥…");
-					break;
-				}
-				case 4: {
-					//ªÒ»°ª∫¥Êƒø¬º£¨±£¥Ê»’÷æ
-					char szTempPath[MAX_PATH];
-					GetTempPath(MAX_PATH, szTempPath);
-					HANDLE hFile = CreateFile(strcat(szTempPath, "\\ToolkitLog.txt"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
-					WriteFile(hFile, sOutPut.c_str(), sOutPut.size() + 1, NULL, NULL);
-					FlushFileBuffers(hFile);
-					//¥Úø™Œƒº˛æ‰±˙
-					ShellExecute(hwnd, "open", szTempPath, NULL, NULL, SW_SHOW);
-					CloseHandle(hFile);
-					break;
-				}
-				/*case SC_CLOSE:
-					if((GetAsyncKeyState(VK_MENU) & 1)/* && (GetAsyncKeyState(VK_F4) & 1)*)break;//Alt+F4≤ª◊Ó–°ªØ£¨÷±Ω”πÿ±’
-					PostMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, lParam);//∏ƒŒ™◊Ó–°ªØ
-					return TRUE;*/
-				case SC_MINIMIZE:
-					SetActiveWindow(hwnd);//TODO: ºÏ≤È±¿¿£Œ Ã‚
-					focus = GetFocus();//∑¿÷π◊Ó–°ªØ∫ÛΩπµ„ ß–ß
-			}
-			return DefWindowProc(hwnd, Message, wParam, lParam);
-		case WM_SIZE:
-			if (wParam == SIZE_MINIMIZED) {
-				ShowWindow(hwnd, SW_HIDE); //“˛≤ÿ
-				return TRUE;
-			}
-		/* All other messages (a lot of them) are processed using default procedures */
-		default:
-			if (Message == WM_TASKBAR)
-				Shell_NotifyIcon(NIM_ADD, &icon);
-			return DefWindowProc(hwnd, Message, wParam, lParam);
-	}
-	return TRUE;
-}
-/* The 'main' function of Win32 GUI programs: this is where execution starts */
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	//SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
-	SetUnhandledExceptionFilter(GlobalExceptionHandler);
-	//¡¥Ω”Œ¥µº≥ˆAPI
-	InitNTAPI();
-	//≈–∂œµ±«∞‘À––»®œﬁ
-	HANDLE hToken;
-	OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken);
-	DWORD dwLength = 0;
-	GetTokenInformation(hToken, TokenIntegrityLevel, NULL, 0, &dwLength);
-	PTOKEN_MANDATORY_LABEL pTIL = (PTOKEN_MANDATORY_LABEL)LocalAlloc(0, dwLength);
-	if(GetTokenInformation(hToken, TokenIntegrityLevel, pTIL, dwLength, &dwLength)){
-		DWORD dwLevel = *GetSidSubAuthority(pTIL->Label.Sid, *GetSidSubAuthorityCount(pTIL->Label.Sid) - 1);
-		if (dwLevel >= SECURITY_MANDATORY_SYSTEM_RID)
-			eLevel = RL_SYSTEM;
-		else if (dwLevel >= SECURITY_MANDATORY_HIGH_RID)
-			eLevel = RL_ADMIN;
-		else
-			eLevel = RL_USER;
-	} else eLevel = RL_UNKNOWN;
-	//“‘System»®œﬁ∆Ù∂Ø◊‘…Ì£¨∞≤»´ƒ£ ΩªÚUser»®œﬁ≤ª––
-	//œÍº˚https://blog.csdn.net/weixin_42112038/article/details/126308315
-	int argc; bool bStartAsSystem = false;
-	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-	if (argv){
-		bStartAsSystem = (!_wcsicmp(argv[1], L"-s") || !_wcsicmp(argv[1], L"/s"));
-		LocalFree(argv);
-	}
-	if (eLevel != RL_SYSTEM && bStartAsSystem) {
-		EnableDebugPrivilege();
-		HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("lsass.exe"));
-		if (!hProcess)hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("winlogon.exe"));
-		HANDLE hTokenx, hToken;
-		OpenProcessToken(hProcess, TOKEN_DUPLICATE, &hTokenx);
-		DuplicateTokenEx(hTokenx, MAXIMUM_ALLOWED, NULL, SecurityIdentification, TokenPrimary, &hToken);
-		CloseHandle(hProcess);
-		CloseHandle(hTokenx);
-		STARTUPINFOW si;
-		PROCESS_INFORMATION pi;
-		ZeroMemory(&si, sizeof(STARTUPINFOW));
-		si.cb = sizeof(STARTUPINFOW);
-		GetStartupInfoW(&si);
-		BOOL bResult = CreateProcessWithTokenW(hToken, LOGON_NETCREDENTIALS_ONLY, NULL, GetCommandLineW(), NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
-		error = GetLastError();
-		CloseHandle(hToken);
-		if (bResult)return 0;
-		else MessageBox(NULL, "Œﬁ∑®“‘œµÕ≥»®œﬁ‘À––±æ≥Ã–Ú£¨“—“‘∆’Õ®∑Ω Ω‘À––°£”˚¡ÀΩ‚∏¸∂‡–≈œ¢£¨«Î≤Èø¥…œ“ª∏ˆ¥ÌŒÛ°£", "º´”Úπ§æﬂ∞¸", MB_ICONERROR | MB_OK);
-	}
-	//÷˜≥Ã–Úø™ º
-	WNDCLASSEX wc; /* A properties struct of our window */
-	MSG msg; /* A temporary location for all messages */
-	/* zero out the struct and set the stuff we want to modify */
-	memset(&wc, 0, sizeof(wc));
-	wc.cbSize		 = sizeof(WNDCLASSEX);
-	wc.lpfnWndProc	 = WndProc; /* This is where we will send messages to */
-	wc.hInstance	 = hInstance;
-	wc.hCursor		 = LoadCursor(NULL, IDC_ARROW);
-
-	/* White, COLOR_WINDOW is just a #define for a system color, try Ctrl+Clicking it */
-	wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
-	wc.lpszClassName = "WindowClass";
-	wc.hIcon		 = LoadIcon(hInstance, "MAINICON"); /* Load a standard icon */
-	wc.hIconSm		 = LoadIcon(hInstance, "MAINICON"); /* use the name "A" to use the project icon */
-
-	if (!RegisterClassEx(&wc)) {
-		MessageBox(NULL, "¥∞ø⁄¿‡◊¢≤· ß∞‹£°«Î÷ÿ∆Ù≥Ã–Ú°£", "º´ ”Ú π§ æﬂ ∞¸", MB_ICONEXCLAMATION | MB_OK);
-		return 0;
-	}
-
-	//ÀÊª˙¥∞ø⁄√˚
-	hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, "WindowClass", RandomWindowTitle(), (WS_OVERLAPPEDWINDOW | WS_VISIBLE)^WS_MAXIMIZEBOX ^ WS_SIZEBOX, 0, 0, width, height, NULL, NULL, hInstance, NULL);
-
-	if (hwnd == NULL) {
-		MessageBox(NULL, "¥∞ø⁄¥¥Ω® ß∞‹£°«Î÷ÿ∆Ù≥Ã–Ú°£", "º´ ”Ú π§ æﬂ ∞¸", MB_ICONEXCLAMATION | MB_OK);
-		return 0;
-	}
-
-	ShowWindow(hwnd, nCmdShow);
-	UpdateWindow(hwnd);
-	/*
-		This is the heart of our program where all input is processed and
-		sent to WndProc. Note that GetMessage blocks code flow until it receives something, so
-		this loop will not produce unreasonably high CPU usage
-	*/
-	while (GetMessage(&msg, NULL, 0, 0) > 0) { /* If no error is received... */
-		if (!IsDialogMessage(hwnd, &msg)) {
-			TranslateMessage(&msg); /* Translate key codes to chars if present */
-			DispatchMessage(&msg); /* Send it to WndProc */
-		}
-	}
-	return msg.wParam;
-}
-
-//----------º´”Ú----------
-
-//https://blog.csdn.net/liu_zhou_zhou/article/details/118603143
-BOOL GetMythwarePasswordFromRegedit(char *str) {
-	HKEY retKey;
-	BYTE retKeyVal[MAX_PATH * 2] = { 0 };
-	DWORD nSize = MAX_PATH * 2;
-	LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SOFTWARE\\TopDomain\\e-Learning Class\\Student", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
-	if (ret != ERROR_SUCCESS) {
-		return FALSE;
-	}
-	ret = RegQueryValueExA(retKey, "knock1", NULL, NULL, (LPBYTE)retKeyVal, &nSize);
-	RegCloseKey(retKey);
-	if (ret != ERROR_SUCCESS) {
-		return FALSE;
-	}
-	for (int i = 0; i < int(nSize); i += 4) {
-		retKeyVal[i + 0] = (retKeyVal[i + 0] ^ 0x50 ^ 0x45);
-		retKeyVal[i + 1] = (retKeyVal[i + 1] ^ 0x43 ^ 0x4c);
-		retKeyVal[i + 2] = (retKeyVal[i + 2] ^ 0x4c ^ 0x43);
-		retKeyVal[i + 3] = (retKeyVal[i + 3] ^ 0x45 ^ 0x50);
-	}
-	int sum = 0;
-	for (int i = 0; i < int(nSize); i += 1) {
-		if (retKeyVal[i + 1] == 0) {
-			*(str + sum) = retKeyVal[i];
-			sum++;
-			if (retKeyVal[i] == 0) break;
-		}
-	}
-	return TRUE;
-}
-
-//∆¡ƒªπ„≤•±ÍÃ‚
-constexpr LPCSTR sBdCst[2] = {"∆¡ƒªπ„≤•", " ’˝‘⁄π≤œÌ∆¡ƒª"};
-BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-	MW_INFO* info = (MW_INFO*)lParam; DWORD pid;
-	//π˝¬À∑«º´”Ú¥∞ø⁄°£µ±»ª’‚¿Ô£®’˚∏ˆ≥Ã–Ú£©µƒŒ Ã‚æÕ «Œﬁ∑®¥¶¿Ì∂‡∏ˆÕ¨√˚Ω¯≥Ãµƒ«Èøˆ
-	GetWindowThreadProcessId(hwnd, &pid);
-	if(pid != info->pid)return TRUE;
-	//≈–∂œ «∑ÒŒﬁœÏ”¶£®»ŒŒÒπ‹¿Ì∆˜√≤À∆“≤ «’‚√¥≈–∂œµƒ£©
-	HWND hOwner = GetWindow(hwnd, GW_OWNER);
-	LONG l = GetWindowLong(hwnd, GWL_EXSTYLE);
-	if((!hOwner || !IsWindowVisible(hOwner) || (l & WS_EX_APPWINDOW))
-	   /*&& IsWindowVisible(hwnd)*/ && (l & WS_EX_TOOLWINDOW) == 0 && IsHungAppWindow(hwnd))
-		info->bNotResponding = true;
-	// «∑Ò «afx¿‡√˚£®º´”Ú π”√¡ÀMFCøÚº‹£©£¨’‚—˘ºı…Ÿ∫‹∂‡±»Ωœ£¨Ã·∏ﬂ–ß¬ µƒÕ¨ ±”÷ƒ‹ºı…ŸŒÛ…±
-	char szClass[5];
-	if (GetClassName(hwnd, szClass, 5) && _stricmp(szClass, "Afx:") == 0) {
-		//ªÒ»°¥∞ø⁄±ÍÃ‚
-		int nLength = GetWindowTextLength(hwnd);
-		char szName[nLength + 2];
-		GetWindowText(hwnd, szName, nLength + 1);
-		//±»Ωœ±ÍÃ‚£¨∑÷± «»´Œƒ±»Ωœ∫Õ±»Ωœƒ©Œ≤
-		if (_stricmp(szName, sBdCst[0]) == 0 ||
-			_stricmp(szName + nLength - strlen(sBdCst[1]), sBdCst[1]) == 0) {
-			//Ω´ƒø±Í¥∞ø⁄æ‰±˙Õ®π˝lParam¥´ªÿµ˜”√¥¶
-			info->hwndOfBoardcast = hwnd;
-			return FALSE;
-		}
-	}
-	return TRUE;
-}
-/* »ŒŒÒπ‹¿Ì∆˜≈–∂œ¥∞ø⁄ «∑ÒŒﬁœÏ”¶ ±£¨µ˜”√¡À¡Ω∏ˆŒ¥π´ø™∫Ø ˝°£”¶∏√≤ª”∞œÏŒ“√«≈–∂œ£¨Œﬁ–Ëµ˜”√£¨º«¬º‘⁄¥À£∫
-	User32.dll
-	HWND WINAPI GhostWindowFromHungWindow(HWND hwndHung);
-	HWND WINAPI HungWindowFromGhostWindow(HWND hwndGhost);
-*/
-
-//“ª’–¥Ú∂œ»´≤øµ◊≤„hook
-LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
-	return FALSE;
-}
-
-//----------ΩÁ√Ê----------
-
-//https://www.52pojie.cn/thread-542884-1-1.html ”–…æ∏ƒ TODO: ≥¢ ‘FreeModule(libTDMaster.dll)
-DWORD WINAPI KeyHookThreadProc(LPVOID lpParameter) {
-	HMODULE hModule = GetModuleHandle(NULL);
-	while (true) {
-		kbdHook = (HHOOK)SetWindowsHookEx(WH_KEYBOARD_LL, (HOOKPROC)HookProc, hModule, 0);
-		Sleep(25);
-		UnhookWindowsHookEx(kbdHook);
-	}
-	return 0;
-}
-DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter) {
-	HMODULE hModule = GetModuleHandle(NULL);
-	while (true) {
-		mseHook = (HHOOK)SetWindowsHookEx(WH_MOUSE_LL, (HOOKPROC)HookProc, hModule, 0);
-		ClipCursor(NULL);
-		Sleep(25);
-		UnhookWindowsHookEx(mseHook);
-	}
-	return 0;
-}
-
-DWORD WINAPI ThreadProc(LPVOID lpParameter) {
-	while (true) {
-		SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-		Sleep(40);//Œﬁ–Ëπ˝øÏ÷√∂•£¨’‚∏ˆ∂´Œ˜Ãÿ±∫ƒCPU
-	}
-	return 0L;
-}
-
-LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam) {
-	if (nCode == HCBT_ACTIVATE) {
-		HWND msgHwnd = HWND(wParam);
-		char szClass[7];
-		GetClassName(msgHwnd, szClass, 7);
-		if (_stricmp("#32770", szClass) == 0) { //≈–∂œ¥´»Î¥∞ø⁄ «∑Ò «MessageBoxµƒ¥∞ø⁄
-			//ªÒ»°¥∞ø⁄±ÍÃ‚
-			int nLength = GetWindowTextLength(msgHwnd);
-			char szName[nLength + 2];
-			GetWindowText(msgHwnd, szName, nLength + 1);
-			if (_stricmp(szName, " µ ±º‡≤‚") == 0) {
-				SetDlgItemText(msgHwnd, IDYES, "πÿ±’");
-				SetDlgItemText(msgHwnd, IDNO, "«ø÷∆πÿ±’");
-				SetDlgItemText(msgHwnd, IDCANCEL, "»°œ˚");
-				HMENU msgMenu = GetSystemMenu(msgHwnd, FALSE);
-				EnableMenuItem(msgMenu, SC_CLOSE, MF_GRAYED);
-			} else if (_stricmp(szName, "USB Setting") == 0) {
-				SetDlgItemText(msgHwnd, IDYES, "»ÌΩ‚Ω˚");
-				SetDlgItemText(msgHwnd, IDNO, "”≤Ω‚Ω˚");
-			} else if (_stricmp(szName, "≥Ã–Ú≥ˆœ÷“Ï≥£") == 0) {
-				SetDlgItemText(msgHwnd, IDYES, "÷’÷π≥Ã–Ú");
-				SetDlgItemText(msgHwnd, IDNO, "ºÃ–¯");
-			}
-			
-		}
-	}
-	return CallNextHookEx(NULL, nCode, wParam, lParam);
-}
-
-BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam) {
-	SendMessage(hwndChild, WM_SETFONT, WPARAM(lParam), 0);
-	return TRUE;
-}
-
-inline LPCSTR RandomWindowTitle() {
-	//ÀÊª˙¥∞ø⁄√˚
-	std::srand((unsigned) time(NULL));
-	LPSTR title = new char[11];
-	memset(title, 0, 11);
-	for (int i = 0; i < 10; i++) {
-		int u = std::rand(), c = u % 31;//«Û”‡31 «Œ™¡Àºı…Ÿ ˝◊÷≥ˆœ÷∏≈¬ 
-		if (c < 5)title[i] = u % 10 + '0';
-		else if (c < 18)title[i] = u % 26 + 'a';
-		else title[i] = u % 26 + 'A';
-	}
-	return title;
-}
-
-bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
-	icon.cbSize = sizeof(NOTIFYICONDATA); // Ω·ππ¥Û–°
-	icon.hWnd = m_hWnd; // Ω” ’ Õ–≈ÃÕ®÷™œ˚œ¢ µƒ¥∞ø⁄æ‰±˙
-	icon.uID = 0;
-	icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP; //±Ì æuCallbackMessage ”––ß
-	icon.uCallbackMessage = WM_USER + 3; // œ˚œ¢±ª∑¢ÀÕµΩ¥À¥∞ø⁄π˝≥Ã
-	icon.hIcon = LoadIcon(hInstance, "MAINICON");
-	strcpy(icon.szTip, "º´”Úπ§æﬂ∞¸");             // Ã· æŒƒ±æ
-	return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
-}
-
-//----------Ω¯≥Ã----------
-
-//https://blog.csdn.net/yanglx2022/article/details/46582629
-DWORD GetProcessIDFromName(LPCSTR szName) {
-	DWORD id = 0;       // Ω¯≥ÃID
-	PROCESSENTRY32 pe;  // Ω¯≥Ã–≈œ¢
-	pe.dwSize = sizeof(PROCESSENTRY32);
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0); // ªÒ»°œµÕ≥Ω¯≥Ã¡–±Ì
-	if (Process32First(hSnapshot, &pe)) {   // ∑µªÿœµÕ≥÷–µ⁄“ª∏ˆΩ¯≥Ãµƒ–≈œ¢
-		do {
-			if (0 == _stricmp(pe.szExeFile, szName)) { // ≤ª«¯∑÷¥Û–°–¥±»Ωœ
-				id = pe.th32ProcessID;
-				break;
-			}
-		} while (Process32Next(hSnapshot, &pe));     // œ¬“ª∏ˆΩ¯≥Ã
-	}
-	CloseHandle(hSnapshot);     // …æ≥˝øÏ’’
-	return id;
-}
-
-//https://blog.csdn.net/zuishikonghuan/article/details/47746451
-BOOL EnableDebugPrivilege() {
-	HANDLE hToken;
-	LUID Luid;
-	TOKEN_PRIVILEGES tp;
-
-	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken))return FALSE;
-
-	if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &Luid)) {
-		CloseHandle(hToken);
-		return FALSE;
-	}
-
-	tp.PrivilegeCount = 1;
-	tp.Privileges[0].Luid = Luid;
-	tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-
-	if (!AdjustTokenPrivileges(hToken, false, &tp, sizeof(tp), NULL, NULL)) {
-		CloseHandle(hToken);
-		return FALSE;
-	}
-	CloseHandle(hToken);
-	return TRUE;
-}
-
-//”√…±µÙ√ø∏ˆœﬂ≥Ãµƒ∑Ω∑®Ω‚æˆƒ≥–©Ω¯≥Ãhook◊°¡ÀTerminateProcess()µƒŒ Ã‚
-bool KillProcess(DWORD dwProcessID, int way) {
-	if (way == KILL_FORCE) {
-		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, dwProcessID);
-		if (hSnapshot != INVALID_HANDLE_VALUE) {
-			bool rtn = true;
-			THREADENTRY32 te = {sizeof(te)};
-			BOOL fOk = Thread32First(hSnapshot, &te);
-			for (; fOk; fOk = Thread32Next(hSnapshot, &te)) {
-				if (te.th32OwnerProcessID == dwProcessID) {
-					HANDLE hThread = OpenThread(THREAD_TERMINATE, FALSE, te.th32ThreadID);
-					if (!TerminateThread(hThread, 0)) rtn = false;
-					CloseHandle(hThread);
-				}
-			}
-			CloseHandle(hSnapshot);
-			return rtn;
-		}
-		return false;
-	} else if (way == KILL_DEFAULT) {
-		//ƒ¨»œ∑Ω∑®£¨Œ»∂®∞≤»´
-		HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, dwProcessID);
-		WINBOOL sta = TerminateProcess(handle, 0);
-		CloseHandle(handle);
-		return sta;
-	}
-	return false;
-}
-
-bool KillAllProcessWithName(LPCSTR name, int way) {
-	PROCESSENTRY32 pe; bool s = false;
-	pe.dwSize = sizeof(PROCESSENTRY32);
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (Process32First(hSnapshot, &pe)) {
-		do {
-			if(!_stricmp(pe.szExeFile, name))
-				s = KillProcess(pe.th32ProcessID, way);
-		} while (Process32Next(hSnapshot, &pe));
-	}
-	CloseHandle(hSnapshot);
-	return s;
-}
-
-//π“∆Ω¯≥Ã£¨µ˜”√Œ¥π´ø™∫Ø ˝NtSuspendProcess°£suspend≤Œ ˝æˆ∂®π“∆/ª÷∏¥
 NTSTATUS (NTAPI *NtSuspendProcess)(IN HANDLE Process);
 NTSTATUS (NTAPI *NtResumeProcess)(IN HANDLE Process);
 
-BOOL SuspendProcess(DWORD dwProcessID, BOOL suspend) {
-	HANDLE handle = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, dwProcessID);
-	if (suspend) {
-		return NtSuspendProcess(handle) == 0;
-	} else {
-		return NtResumeProcess(handle) == 0;
-	}
+static LPCSTR helpText = "ÊûÅÂüüÂ∑•ÂÖ∑ÂåÖ v2.0 | Â∞èÊµÅÊ±óÈªÑË±Ü | ‰∫§ÊµÅÁæ§828869154ÔºàËøõÁæ§ËØ∑Ê≥®ÊòéÊûÅÂüüÂ∑•ÂÖ∑ÂåÖÔºâ\n\
+È¢ùÂ§ñÂäüËÉΩÔºö1. Âø´Êç∑ÈîÆAlt+CÂèåÂáªÊùÄÊéâÂΩìÂâçËøõÁ®ãÔºåAlt+WÊúÄÂ∞èÂåñÈ°∂Â±ÇÁ™óÂè£ÔºåAlt+BÂî§Ëµ∑‰∏ªÁ™óÂè£\n\
+2. ÊÇ¨ÊµÆÁ™óÂ∑¶ÈîÆÊâìÂºÄ‰∏ªÈù¢ÊùøÔºåÂè≥ÈîÆÁõ¥Êé•ÂàáÊç¢ÂπøÊí≠Á™óÂè£Âåñ/ÂÖ®Â±èÂåñÔºåÂèØÊãñÊãΩÁßªÂä®\n\
+3. ÊúÄÂ∞èÂåñÊó∂ÈöêËóèÂà∞‰ªªÂä°Ê†èÊâòÁõòÔºåÂ∑¶ÈîÆÂèåÂáªÊâìÂºÄ‰∏ªÁïåÈù¢ÔºåÂè≥ÈîÆÂçïÂáªË∞ÉÂá∫ËèúÂçï\n\
+4. Ëß£Á¶ÅÂ∑•ÂÖ∑ÂèØËß£Á¶ÅChromeÂíåEdgeÁöÑÂ∞èÊ∏∏ÊàèÔºõËã•ÊèêÁ§∫ËÆæÁΩÆÂ§±Ë¥•ÔºåÂèØËÉΩÊòØÊó†ÊùÉÈôêÊàñÊåáÂÆöÊ≥®ÂÜåË°®ÈîÆÂÄº‰∏çÂ≠òÂú®\n\
+5. Ëß£ÈîÆÁõòÈîÅÂäüËÉΩÂ¶ÇÊûúÂØπAlt+Ctrl+DeleteÊó†ÊïàÊó∂ÔºåÈáçÊñ∞ÂãæÈÄâÂç≥ÂèØ\n\
+6. ÂêØÂä®Êó∂ÈôÑÂä†-sÊàñ/sÂëΩ‰ª§Ë°åÂèØ‰ª•SystemÊùÉÈôêÂêØÂä®\n\
+7. MeltdownDFC‰∏∫ÂÜ∞ÁÇπËøòÂéüÂØÜÁ†ÅÁ†¥Ëß£Â∑•ÂÖ∑Ôºåcrdisk‰∏∫ÂÖ∂‰ªñ‰øùÊä§Á≥ªÁªüÂà†Èô§Â∑•ÂÖ∑ÔºàÊÖéÁî®ÔºÅÔºâ";
+
+static bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
+    icon.cbSize = sizeof(NOTIFYICONDATA); icon.hWnd = m_hWnd; icon.uID = 0;
+    icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    icon.uCallbackMessage = WM_USER + 3;
+    icon.hIcon = LoadIcon(hInstance, "MAINICON");
+    strcpy(icon.szTip, "ÊûÅÂüüÂ∑•ÂÖ∑ÂåÖ");
+    return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
 }
 
-//‘⁄‘≠Ω·ππ÷Æ∫Ûº”…œ≤ª”∞œÏΩ·ππ¥Û–°µƒœﬂ≥Ã ˝◊È£¨«…√Ó‘À”√‘ΩΩÁ¥¯¿¥µƒøÁΩ·ππ∑√Œ ∫Û√Êµƒœﬂ≥ÃΩ·ππ
-typedef struct _MYSYSTEM_PROCESS_INFORMATION : SYSTEM_PROCESS_INFORMATION {
-	//“‘…œŒ™‘≠Ω·ππƒ⁄»›
-	SYSTEM_THREAD_INFORMATION Threads[0];
-} MYSYSTEM_PROCESS_INFORMATION, *PMYSYSTEM_PROCESS_INFORMATION;
-
-//∏≤∏«‘≠∂®“Â
-#define SYSTEM_PROCESS_INFORMATION MYSYSTEM_PROCESS_INFORMATION
-#define PSYSTEM_PROCESS_INFORMATION PMYSYSTEM_PROCESS_INFORMATION
-
-//∂®“Â∫Ø ˝‘≠–Õ
-NTSTATUS (NTAPI *MyNtQuerySystemInformation)
-(IN SYSTEM_INFORMATION_CLASS SystemInformationClass, IN OUT PVOID SystemInformation,
- IN ULONG SystemInformationLength, OUT PULONG ReturnLength OPTIONAL);
-#define NtQuerySystemInformation MyNtQuerySystemInformation
-DWORD (NTAPI *RtlNtStatusToDosErrorNoTeb)(NTSTATUS Status);
-
-//ªÒ»°Ω¯≥Ãµƒ◊¥Ã¨
-//∑µªÿ-1£¨±Ì æ∑¢…˙“Ï≥£
-//∑µªÿ0£¨±Ì æΩ¯≥Ã√ª”–±ªπ“∆
-//∑µªÿ1£¨±Ì æΩ¯≥Ã¥¶”⁄π“∆◊¥Ã¨
-int GetProcessState(DWORD dwProcessID) {
-	int nStatus = -1;
-	//œ»µ˜”√“ª¥Œ£¨ªÒ»°À˘–Ëª∫≥Â«¯¥Û–°
-	DWORD dwSize;
-	NtQuerySystemInformation(SystemProcessInformation, NULL, 0, &dwSize);
-	//…Í«Îª∫≥Â«¯
-	HGLOBAL hBuffer = GlobalAlloc(LPTR, dwSize);
-	if (hBuffer == NULL)
-		return nStatus;
-	PSYSTEM_PROCESS_INFORMATION pInfo = PSYSTEM_PROCESS_INFORMATION(hBuffer);
-	//≤È—Ø
-	NTSTATUS lStatus = NtQuerySystemInformation(SystemProcessInformation, pInfo, dwSize, 0);
-	if (!NT_SUCCESS(lStatus)) {
-		GlobalFree(hBuffer);
-		//NTSTATUS ◊™ win32 error
-		error = RtlNtStatusToDosErrorNoTeb(lStatus);
-		return nStatus;
-	}
-	//±È¿˙Ω¯≥Ã
-	while (true) {
-		//≈–∂œ «∑Ò «ƒø±ÍΩ¯≥Ã
-		if (((DWORD)(ULONG_PTR) pInfo->UniqueProcessId) == dwProcessID) {
-			nStatus = 1;
-			//±È¿˙œﬂ≥Ã
-			for (ULONG i = 0; i < pInfo->NumberOfThreads; i++) {
-				//»Áπ˚≤ª «‘⁄π“∆£¨æÕ±Ì√˜≥Ã–Ú¥ÊªÓ£¨ø…“‘∑µªÿ£®∂¬»˚°¢ŒﬁœÏ”¶≤ªÀ„π“∆£©
-				if (pInfo->Threads[i].WaitReason != Suspended) {
-					nStatus = 0;
-					break;
-				}
-			}
-			break;
-		}
-		//±È¿˙Ω¯≥ÃÕÍ≥…
-		if (pInfo->NextEntryOffset == 0)
-			break;
-		//“∆∂ØµΩœ¬“ª∏ˆΩ¯≥Ã–≈œ¢Ω·ππµƒµÿ÷∑
-		pInfo = PSYSTEM_PROCESS_INFORMATION(PBYTE(pInfo) + pInfo->NextEntryOffset);
-	}
-	// Õ∑≈ª∫≥Â«¯
-	GlobalFree(hBuffer);
-	return nStatus;
+static void RunEmbeddedExe(int resId, LPCSTR exeName) {
+    DWORD dwPID = GetProcessIDFromName(exeName);
+    if (dwPID) return;
+    char szTempPath[MAX_PATH]; GetTempPath(MAX_PATH, szTempPath);
+    HANDLE hFile = CreateFile(strcat(szTempPath, exeName), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) { SetWindowText(TxOut, "ÂàõÂª∫Â§±Ë¥•"); return; }
+    HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(resId), RT_RCDATA);
+    HGLOBAL hResData = LoadResource(NULL, hResInfo);
+    DWORD dwSize = SizeofResource(NULL, hResInfo);
+    LPVOID pData = LockResource(hResData);
+    if (pData) {
+        if (!WriteFile(hFile, pData, dwSize + 1, NULL, NULL)) { SetWindowText(TxOut, "ÂÜôÂÖ•Â§±Ë¥•"); CloseHandle(hFile); return; }
+        FlushFileBuffers(hFile); CloseHandle(hFile);
+        if (WinExec(szTempPath, SW_SHOW) < 32) SetWindowText(TxOut, "ÂêØÂä®Â§±Ë¥•");
+        else SetWindowText(TxOut, "ÊâßË°åÂÆåÊàê");
+    } else { SetWindowText(TxOut, "ÂÜôÂÖ•Â§±Ë¥•"); CloseHandle(hFile); }
 }
 
-//»°∫Ø ˝µÿ÷∑
-void InitNTAPI(){
-	HMODULE ntdll = GetModuleHandle("ntdll.dll");
-	Set(NtSuspendProcess, GetProcAddress(ntdll, "NtSuspendProcess"));
-	Set(NtResumeProcess, GetProcAddress(ntdll, "NtResumeProcess"));
-	Set(NtQuerySystemInformation, GetProcAddress(ntdll, "NtQuerySystemInformation"));
-	Set(RtlNtStatusToDosErrorNoTeb, GetProcAddress(ntdll, "RtlNtStatusToDosErrorNoTeb"));
+LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
+    switch (Message) {
+        case WM_CREATE: {
+            OSVERSIONINFO vi = {sizeof(OSVERSIONINFO)}; GetVersionEx(&vi);
+            SYSTEM_INFO si = {}; GetNativeSystemInfo(&si);
+            char szVersion[BUFSIZ] = {};
+            sprintf(szVersion, "Á≥ªÁªüÁâàÊú¨Ôºö%u.%u.%u %d-bit\nÁ®ãÂ∫èÁâàÊú¨Ôºö%s %d-bit\n",
+                vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber,
+                (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, "2.0.0", sizeof(PVOID)*8);
+            sOutPut += szVersion;
+            EnableDebugPrivilege();
+            w = GetSystemMetrics(SM_CXSCREEN) - 1; h = GetSystemMetrics(SM_CYSCREEN) - 1;
+            WM_TASKBAR = RegisterWindowMessage("TaskbarCreated");
+            thread = CreateThread(NULL, 0, ThreadProc, NULL, 0, NULL);
+            keyHook = CreateThread(NULL, 0, KeyHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
+            mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
+            SetTimer(hwnd, 1, 1000, NULL); SetTimer(hwnd, 2, 2000, NULL);
+            RegisterHotKey(hwnd, 0, MOD_ALT, 'C'); RegisterHotKey(hwnd, 1, MOD_ALT, 'W');
+            if (!RegisterHotKey(hwnd, 2, MOD_ALT, 'B'))
+                if (MessageBox(hwnd, "Ê≥®ÂÜåÁ≥ªÁªüÁ∫ßÁÉ≠ÈîÆ Alt+B Â§±Ë¥•ÔºåÊúâÂèØËÉΩËØ•Â∫îÁî®ÁöÑÂè¶‰∏ÄÂÆû‰æãËøòÂú®ËøêË°åÔºåËØ∑ÂÖàÂÖ≥Èó≠ÂÆÉÂÜçÈáçÊñ∞ÂêØÂä®Êú¨Á®ãÂ∫èÔºÅÂê¶ÂàôÂî§Âá∫Á™óÂè£ÂäüËÉΩÂ∞ÜÂ§±ÊïàÔºÅËã•ÁÇπÂáª„ÄåÂèñÊ∂à„ÄçÂàôÈòªÊ≠¢Á®ãÂ∫èÁªßÁª≠ÂêØÂä®",
+                    "ÊûÅ Âüü Â∑• ÂÖ∑ ÂåÖ", MB_OKCANCEL | MB_ICONWARNING) == IDCANCEL) { PostQuitMessage(0); return FALSE; }
+
+            HINSTANCE hi = ((LPCREATESTRUCT)lParam)->hInstance;
+            int L = 12, R = 330, LW = 310, RW = 290, y;
+
+            TxLnk = CreateWindow("SysLink", "ÊûÅÂüüÂ∑•ÂÖ∑ÂåÖ <a href=\"https://github.com/BengbuGuards/MythwareToolkit\">GitHub</a>",
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP, L + 2, 6, 220, 22, hwnd, HMENU(1001), hi, NULL);
+            BtAbt = CreateWindow(WC_BUTTON, "ÂÖ≥‰∫é/Â∏ÆÂä©", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+                R + RW - 100, 2, 100, 28, hwnd, HMENU(1002), hi, NULL);
+
+            char str[BUFSIZ] = {}; LPCSTR psd;
+            if (!GetMythwarePasswordFromRegedit(str)) psd = "Ëé∑ÂèñÂØÜÁ†ÅÂ§±Ë¥•"; else psd = str;
+            CreateWindow(WC_STATIC, "ÊûÅÂüüÂØÜÁ†Å:", WS_CHILD | WS_VISIBLE, L + 2, 32, 56, 22, hwnd, NULL, hi, NULL);
+            CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, psd, WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_READONLY,
+                L + 62, 30, LW - 68, 22, hwnd, HMENU(1003), hi, NULL);
+
+            y = 58;
+            CreateWindow(WC_BUTTON, "ÊûÅÂüüÊéßÂà∂", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, L, y, LW, 138, hwnd, NULL, hi, NULL);
+            BtKmw = CreateWindow(WC_BUTTON, "ÊùÄÊéâÊûÅÂüü", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_SPLITBUTTON,
+                L + 8, y + 16, LW - 16, 40, hwnd, HMENU(1004), hi, NULL);
+            CreateWindow(WC_BUTTON, "ÂπøÊí≠Á™óÂè£Âåñ", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | WS_DISABLED,
+                L + 8, y + 64, 144, 30, hwnd, HMENU(1014), hi, NULL);
+            CreateWindow(WC_BUTTON, "Âä®ÊÄÅÂØÜÁ†ÅËÆ°ÁÆóÂô®", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+                L + 158, y + 64, 144, 30, hwnd, HMENU(1015), hi, NULL);
+
+            y = 58; int gap = RW - 16 - 134*2;
+            CreateWindow(WC_BUTTON, "È´òÁ∫ßÂ∑•ÂÖ∑", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, R, y, RW, 138, hwnd, NULL, hi, NULL);
+            CreateWindow(WC_BUTTON, "‰∏ÄÈîÆËß£Á¶ÅÁ≥ªÁªüÁ®ãÂ∫è", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8, y + 16, 134, 30, hwnd, HMENU(1007), hi, NULL);
+            CreateWindow(WC_BUTTON, "ÈáçÂêØËµÑÊ∫êÁÆ°ÁêÜÂô®", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8 + 134 + gap, y + 16, 134, 30, hwnd, HMENU(1010), hi, NULL);
+            CreateWindow(WC_BUTTON, "Ëß£Èô§ÊûÅÂüüÁΩëÁªúÈôêÂà∂", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8, y + 54, 134, 30, hwnd, HMENU(1008), hi, NULL);
+            CreateWindow(WC_BUTTON, "Ëß£Èô§ÊûÅÂüüUÁõòÈôêÂà∂", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8 + 134 + gap, y + 54, 134, 30, hwnd, HMENU(1009), hi, NULL);
+            CreateWindow(WC_BUTTON, "MeltdownDFC", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8, y + 92, 134, 24, hwnd, HMENU(1019), hi, NULL);
+            CreateWindow(WC_BUTTON, "crdisk", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8 + 134 + gap, y + 92, 134, 24, hwnd, HMENU(1020), hi, NULL);
+
+            y = 246; int totalW = LW + RW + 8;
+            CreateWindow(WC_BUTTON, "ÂäüËÉΩÂºÄÂÖ≥", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, L, y, totalW, 52, hwnd, NULL, hi, NULL);
+            BtTop = CreateWindow(WC_BUTTON, "ÁΩÆÈ°∂Ê≠§Á™óÂè£", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, L + 14, y + 16, 94, 22, hwnd, HMENU(1016), hi, NULL);
+            SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, 0);
+            BtCur = CreateWindow(WC_BUTTON, "Ëß£Èº†Ê†áÈîÅ(&M)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, L + 120, y + 16, 92, 22, hwnd, HMENU(1017), hi, NULL);
+            SendMessage(BtCur, BM_SETCHECK, BST_CHECKED, 0); ResumeThread(mouHook);
+            BtKbh = CreateWindow(WC_BUTTON, "Ëß£ÈîÆÁõòÈîÅ(&C)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, L + 224, y + 16, 92, 22, hwnd, HMENU(1018), hi, NULL);
+            SendMessage(BtKbh, BM_SETCHECK, BST_CHECKED, 0); ResumeThread(keyHook);
+            BtSnp = CreateWindow(WC_BUTTON, "Èò≤Ê≠¢Êà™Â±è", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX | (IsWindows7OrGreater() ? 0 : WS_DISABLED), R + 10, y + 16, 80, 22, hwnd, HMENU(1011), hi, NULL);
+            SendMessage(BtSnp, BM_SETCHECK, BST_CHECKED, 0); SendMessage(hwnd, WM_COMMAND, 1011, 0);
+            BtWnd = CreateWindow(WC_BUTTON, "ÂêØÁî®Èº†Ê†áÊ£ÄÊµãÂºπÁ™ó", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, R + 100, y + 16, 170, 22, hwnd, HMENU(1012), hi, NULL);
+
+            CreateWindow(WC_BUTTON, "ÊùÄÊéâÂ≠¶ÁîüÊú∫ÊàøÁÆ°ÁêÜÂä©Êâã", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, L, 196, totalW, 44, hwnd, HMENU(1013), hi, NULL);
+
+            TxOut = CreateWindow(STATUSCLASSNAME, "Á≠âÂæÖÊìç‰Ωú", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, hwnd, HMENU(1005), hi, NULL);
+            int pts[2] = {420, -1}; SendMessage(TxOut, SB_SETPARTS, WPARAM(2), LPARAM(pts));
+
+            HWND hToolTip = CreateWindowEx(WS_EX_TOPMOST, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
+                CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwnd, NULL, hi, NULL);
+            TOOLINFO ti = {sizeof(ti)}; ti.uFlags = TTF_IDISHWND | TTF_SUBCLASS; ti.hwnd = hwnd; ti.uId = (UINT_PTR)TxOut;
+            ti.lpszText = const_cast<char*>(GetRunLevelString());
+            SendMessage(hToolTip, TTM_ADDTOOL, 0, (LPARAM)&ti);
+
+            NONCLIENTMETRICS info; info.cbSize = sizeof(NONCLIENTMETRICS);
+            if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &info, 0)) hFont = CreateFontIndirect((LOGFONT*)&info.lfMessageFont);
+            EnumChildWindows(hwnd, SetWindowFont, LPARAM(hFont));
+            SetupTrayIcon(hwnd, hi);
+
+            HMENU sys = GetSystemMenu(hwnd, FALSE);
+            AppendMenu(sys, MF_STRING, 2, "ÊòæÁ§∫‰∏ä‰∏ÄÊ¨°ÈîôËØØ(&E)"); AppendMenu(sys, MF_STRING, 4, "ÊòæÁ§∫Á®ãÂ∫èÊó•Âøó(&L)");
+            AppendMenu(sys, MF_STRING, 3, "ÂêØÂä®‰ªªÂä°ÁÆ°ÁêÜÂô®(&T)"); DrawMenuBar(hwnd);
+            focus = GetDlgItem(hwnd, 1013); SetFocus(focus);
+            SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
+
+            HMODULE hook = NULL;
+            if (sizeof(PVOID) == 8) {
+                hook = GetModuleHandle("LibTDProcHook64.dll"); if (hook) FreeModule(hook);
+                hook = GetModuleHandle("LibTDMaster64.dll"); if (hook) FreeModule(hook);
+            } else {
+                hook = GetModuleHandle("LibTDProcHook32.dll"); if (hook) FreeModule(hook);
+                hook = GetModuleHandle("LibTDMaster32.dll"); if (hook) FreeModule(hook);
+            }
+            break;
+        }
+
+        case WM_INITMENU: { HMENU sys = GetSystemMenu(hwnd, FALSE); SetMenuDefaultItem(sys, SC_MINIMIZE, 0); break; }
+
+        case WM_COMMAND: {
+            switch (LOWORD(wParam)) {
+                case 1002: MessageBox(NULL, helpText, "ÂÖ≥‰∫é/Â∏ÆÂä©", MB_OK | MB_ICONINFORMATION); break;
+                case 1004: ControlMythware(FALSE); UpdateMythwareStatus(); break;
+                case 1007: UnlockSystemPrograms(hwnd); break;
+                case 1008: RemoveNetworkRestrictions(); break;
+                case 1009: RemoveUSBRestrictions(hwnd); break;
+                case 1010: {
+                    HWND hShell = FindWindow("Shell_TrayWnd", NULL); DWORD pid;
+                    GetWindowThreadProcessId(hShell, &pid);
+                    if (pid == 0 || hShell == NULL) { WinExec("explorer.exe", SW_SHOW); break; }
+                    HANDLE handle = OpenProcess(PROCESS_TERMINATE, FALSE, pid);
+                    if (TerminateProcess(handle, 2)) SetWindowText(TxOut, "ÊâßË°åÊàêÂäü");
+                    else { ge; SetWindowText(TxOut, "ÊâßË°åÂ§±Ë¥•"); }
+                    CloseHandle(handle); break;
+                }
+                case 1013: KillStudentAssistant(); break;
+                case 1011: { LRESULT check = SendMessage(BtSnp, BM_GETCHECK, 0, 0); SetWindowDisplayAffinity(hwnd, check == BST_CHECKED ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE); break; }
+                case 1012: { LRESULT check = SendMessage(BtWnd, BM_GETCHECK, 0, 0); ask = check == BST_CHECKED; break; }
+                case 1014: ToggleBroadcastWindow(); UpdateMythwareStatus(); break;
+                case 1015: ShowPsdWnd(); break;
+                case 1016: { LRESULT check = SendMessage(BtTop, BM_GETCHECK, 0, 0); if (check == BST_CHECKED) ResumeThread(thread); else { SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE); SuspendThread(thread); } break; }
+                case 1017: { LRESULT check = SendMessage(BtCur, BM_GETCHECK, 0, 0); if (check == BST_CHECKED) ResumeThread(mouHook); else { SuspendThread(mouHook); UnhookWindowsHookEx(mseHook); } break; }
+                case 1018: {
+                    LRESULT check = SendMessage(BtKbh, BM_GETCHECK, 0, 0);
+                    if (check == BST_CHECKED) {
+                        ResumeThread(keyHook);
+                        HANDLE hDevice = CreateFile("\\\\.\\TDKeybd", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+                        if (GetLastError()) { PrtError(GetLastError() == ERROR_FILE_NOT_FOUND ? "Ëß£ÈîÆÁõòÈîÅÂ§±Ë¥•ÔºöÊûÅÂüüÊú™ÂÆâË£Ö" : "Ëß£ÈîÆÁõòÈîÅÔºöÊâìÂºÄËÆæÂ§áÂ§±Ë¥•", GetLastError()); break; }
+                        BOOL bEnable = TRUE;
+                        if (DeviceIoControl(hDevice, 0x220000, &bEnable, 4, NULL, 0, NULL, NULL)) Print("Ëß£ÈîÆÁõòÈîÅÔºöÂèëÈÄÅÊéßÂà∂Á†ÅÊàêÂäü");
+                        else PrtError("Ëß£ÈîÆÁõòÈîÅÔºöÂèëÈÄÅÊéßÂà∂Á†ÅÂ§±Ë¥•", GetLastError());
+                        CloseHandle(hDevice);
+                    } else { SuspendThread(keyHook); UnhookWindowsHookEx(kbdHook); }
+                    break;
+                }
+                case 1019: RunEmbeddedExe(2, "\\MeltdownDFC.exe"); break;
+                case 1020: RunEmbeddedExe(3, "\\crdisk.exe"); break;
+            }
+            return 0;
+        }
+
+        case WM_HOTKEY:
+            switch (wParam) {
+                case 0: if (closingProcess) { closingProcess = false; KillTimer(hwnd, 3); HWND topHwnd = GetForegroundWindow(); DWORD pid; GetWindowThreadProcessId(topHwnd, &pid); if (pid != GetCurrentProcessId()) KillProcess(pid, KILL_FORCE); } else { closingProcess = true; SetTimer(hwnd, 3, GetDoubleClickTime(), NULL); } break;
+                case 1: { HWND topHwnd = GetForegroundWindow(); if (!IsHungAppWindow(topHwnd)) ShowWindow(topHwnd, SW_MINIMIZE); break; }
+                case 2: ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); break;
+            }
+            return 0;
+
+        case WM_TIMER:
+            switch (wParam) {
+                case 1: if (!asking && ask) {
+                    GetCursorPos(&p);
+                    if (p.x == 0 && p.y == 0) { asking = true; HWND topHwnd = GetForegroundWindow(); if (MessageBox(hwnd, "Ê£ÄÊµãÂà∞Èº†Ê†á‰ΩçÁΩÆÂèòÂåñÔºÅÊòØÂê¶ÊúÄÂ∞èÂåñÁÑ¶ÁÇπÁ™óÂè£Ôºü", "ÂÆûÊó∂ÊèêÈÜí", MB_YESNO | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST) == IDYES) { if (!IsHungAppWindow(topHwnd)) ShowWindow(topHwnd, SW_MINIMIZE); } asking = false; }
+                    else if (p.x == w && p.y == 0) { asking = true; HWND topHwnd = GetForegroundWindow(); HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId()); int id = MessageBox(hwnd, "Ê£ÄÊµãÂà∞Èº†Ê†á‰ΩçÁΩÆÂèòÂåñÔºÅÊòØÂê¶ÂÖ≥Èó≠ÁÑ¶ÁÇπÁ™óÂè£Ôºü", "ÂÆûÊó∂ÊèêÈÜí", MB_YESNOCANCEL | MB_ICONINFORMATION | MB_SETFOREGROUND | MB_TOPMOST); UnhookWindowsHookEx(hCBTHook); if (id == IDYES) PostMessage(topHwnd, WM_CLOSE, 0, 0); else if (id == IDNO) { HWND hParent = CreateWindowEx(0, WC_STATIC, "", 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL); SetParent(topHwnd, hParent); ge; PostMessage(hParent, WM_CLOSE, 0, 0); } asking = false; }
+                } break;
+                case 2: SetWindowText(hwnd, RandomWindowTitle()); UpdateMythwareStatus(); break;
+                case 3: closingProcess = false; KillTimer(hwnd, 3); break;
+            }
+            break;
+
+        case WM_CLOSE: ShowWindow(hwnd, SW_HIDE); return TRUE;
+
+        case WM_DESTROY:
+            CloseLogFile();
+            UnregisterHotKey(hwnd, 0); UnregisterHotKey(hwnd, 1); UnregisterHotKey(hwnd, 2);
+            CloseHandle(thread); CloseHandle(keyHook); CloseHandle(mouHook);
+            Shell_NotifyIcon(NIM_DELETE, &icon); UnhookWindowsHookEx(mseHook); UnhookWindowsHookEx(kbdHook);
+            break;
+
+        case WM_ACTIVATE: {
+            char c[64];
+            if (LOWORD(wParam) == WA_INACTIVE) {
+                if (GetWindowLong(hwnd, GWL_STYLE) & WS_VISIBLE) {
+                    focus = GetFocus();
+                    if (focus && GetClassName(focus, c, sizeof(c)) && _stricmp(c, "Button") == 0) {
+                        LONG style = GetWindowLong(focus, GWL_STYLE);
+                        if ((style & BS_AUTOCHECKBOX) != BS_AUTOCHECKBOX) SendMessage(focus, BM_SETSTYLE, 0, TRUE);
+                    }
+                }
+            } else {
+                if (focus && IsWindow(focus)) { SetFocus(focus);
+                    if (GetClassName(focus, c, sizeof(c)) && _stricmp(c, "Button") == 0) {
+                        LONG style = GetWindowLong(focus, GWL_STYLE);
+                        if ((style & BS_AUTOCHECKBOX) != BS_AUTOCHECKBOX) SendMessage(focus, BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE);
+                    }
+                }
+            }
+            return FALSE;
+        }
+
+        case WM_USER + 3:
+            if (lParam == WM_LBUTTONDBLCLK) { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); }
+            else if (lParam == WM_RBUTTONUP) { GetCursorPos(&pt); SetForegroundWindow(hwnd); HMENU hPopup = CreatePopupMenu(); AppendMenu(hPopup, MF_STRING, 1, "ÂÖ≥Èó≠Á®ãÂ∫è"); AppendMenu(hPopup, MF_STRING, 2, "ÊâìÂºÄÁ™óÂè£"); int i = TrackPopupMenu(hPopup, TPM_RETURNCMD, pt.x, pt.y, 0, hwnd, NULL); if (i == 1) { DestroyFloatingWindow(); PostQuitMessage(0); } else if (i == 2) { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); } }
+            return FALSE;
+
+        case WM_NOTIFY:
+            switch (((LPNMHDR)lParam)->code) {
+                case BCN_DROPDOWN: {
+                    NMBCDROPDOWN* pDropDown = (NMBCDROPDOWN*)lParam;
+                    if (pDropDown->hdr.hwndFrom == BtKmw) {
+                        POINT ptBtn; ptBtn.x = pDropDown->rcButton.left; ptBtn.y = pDropDown->rcButton.bottom;
+                        ClientToScreen(pDropDown->hdr.hwndFrom, &ptBtn);
+                        HMENU hSplitMenu = CreatePopupMenu();
+                        AppendMenu(hSplitMenu, MF_BYPOSITION, 1, (mwSts != 1) ? "ÊåÇËµ∑ÊûÅÂüü" : "ÊÅ¢Â§çÊûÅÂüü");
+                        EnableMenuItem(hSplitMenu, 1, mwSts != 2 ? MF_ENABLED : MF_GRAYED);
+                        SuspendThread(thread);
+                        int i = TrackPopupMenu(hSplitMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, ptBtn.x, ptBtn.y, 0, hwnd, NULL);
+                        ResumeThread(thread);
+                        if (i == 1) { BOOL sts = SuspendProcess(GetProcessIDFromName(MythwareFilename), !mwSts); SetWindowText(TxOut, sts ? "ÊåÇËµ∑/ÊÅ¢Â§çÊàêÂäü" : "ÊåÇËµ∑/ÊÅ¢Â§çÂ§±Ë¥•"); UpdateMythwareStatus(); }
+                        return TRUE;
+                    }
+                    break;
+                }
+                case NM_CLICK:
+                    if (((LPNMHDR)lParam)->hwndFrom == TxOut) {
+                        focus = GetFocus(); char c[64];
+                        if (focus && GetClassName(focus, c, sizeof(c)) && _stricmp(c, "Button") == 0) {
+                            LONG style = GetWindowLong(focus, GWL_STYLE);
+                            if ((style & BS_AUTOCHECKBOX) != BS_AUTOCHECKBOX) SendMessage(focus, BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE);
+                        }
+                        break;
+                    }
+                case NM_RETURN: { PNMLINK pNMLink = (PNMLINK)lParam; LITEM item = pNMLink->item; if ((((LPNMHDR)lParam)->hwndFrom == TxLnk) && (item.iLink == 0)) ShellExecuteW(NULL, L"open", item.szUrl, NULL, NULL, SW_SHOW); break; }
+            }
+            break;
+
+        case WM_NCHITTEST: { UINT nHitTest = DefWindowProc(hwnd, WM_NCHITTEST, wParam, lParam); if (nHitTest == HTCLIENT && GetAsyncKeyState(MK_LBUTTON) < 0) nHitTest = HTCAPTION; return nHitTest; }
+
+        case WM_SYSCOMMAND:
+            switch (wParam) {
+                case 2: { if (error == -1) error = GetLastError(); LPSTR szError = NULL; FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM, NULL, error, 0, (PTSTR)&szError, 0, NULL); char s[BUFSIZ] = {}; sprintf(s, "GetLastError‰∏ä‰∏ÄÊ¨°ËÆ∞ÂΩï\n%uÔºö%s", error, szError); LocalFree(HLOCAL(szError)); MessageBox(hwnd, s, "‰∏ä‰∏ÄÊ¨°ÈîôËØØ", MB_OK | MB_ICONINFORMATION); error = -1; break; }
+                case 3: { HWND h = FindWindow("TaskManagerWindow", NULL); BYTE nCount = 0; if (!h) { DWORD value = 0; HKEY retKey; RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey); RegSetValueEx(retKey, "DisableTaskMgr", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD)); RegFlushKey(retKey); RegCloseKey(retKey); WinExec("taskmgr", SW_SHOW); ge; do { if (++nCount == 60) { SetWindowText(TxOut, "ÂêØÂä®Â§±Ë¥•"); return FALSE; } Sleep(50); h = FindWindow("TaskManagerWindow", NULL); } while (!h); } HMENU hm = GetMenu(h); MENUITEMINFO mii = {sizeof(MENUITEMINFO), MIIM_STATE}; GetMenuItemInfo(hm, 0x7704, FALSE, &mii); if (!(mii.fState & MFS_CHECKED)) PostMessage(h, WM_COMMAND, 0x7704, 0); SetWindowText(TxOut, "ËÆæÁΩÆÂÆåÊàê"); break; }
+                case 4: { char szTempPath[MAX_PATH]; GetTempPath(MAX_PATH, szTempPath); HANDLE hFile = CreateFile(strcat(szTempPath, "\\ToolkitLog.txt"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL); WriteFile(hFile, sOutPut.c_str(), sOutPut.size() + 1, NULL, NULL); FlushFileBuffers(hFile); ShellExecute(hwnd, "open", szTempPath, NULL, NULL, SW_SHOW); CloseHandle(hFile); break; }
+                case SC_MINIMIZE: SetActiveWindow(hwnd); focus = GetFocus(); break;
+            }
+            return DefWindowProc(hwnd, Message, wParam, lParam);
+
+        case WM_SIZE: if (wParam == SIZE_MINIMIZED) { ShowWindow(hwnd, SW_HIDE); return TRUE; } break;
+
+        default: if (Message == WM_TASKBAR) Shell_NotifyIcon(NIM_ADD, &icon); return DefWindowProc(hwnd, Message, wParam, lParam);
+    }
+    return TRUE;
 }
 
-//----------µ˜ ‘----------
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    SetUnhandledExceptionFilter(GlobalExceptionHandler);
+    InitNTAPI();
 
-// ∂®“Â»´æ÷“Ï≥£¥¶¿Ì∫Ø ˝
-LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
-{
-	// µØ≥ˆ∂‘ª∞øÚ≤¢œ‘ æ“Ï≥£ƒ⁄»›
-	char message[BUFSIZ * 2] = {};
-	sprintf(message, "“Ï≥£¥˙¬Î£∫0x%08X£ªŒª”⁄ƒ⁄¥Êµÿ÷∑£∫0x%X\n≥Ã–ÚΩ´%s£¨»Á¥ÀŒ Ã‚“¿æ…¥Ê‘⁄£¨«Î¡™œµø™∑¢’ﬂ", exceptionInfo->ExceptionRecord->ExceptionCode, 
-		exceptionInfo->ExceptionRecord->ExceptionAddress,
-		((exceptionInfo -> ExceptionRecord -> ExceptionFlags) & EXCEPTION_NONCONTINUABLE) ? "ÕÀ≥ˆ" : "≥¢ ‘ºÃ–¯÷¥––");
-	HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
-	int id = MessageBox(NULL, message, "≥Ã–Ú≥ˆœ÷“Ï≥£", MB_ICONERROR | MB_YESNO | MB_DEFBUTTON2);
-	UnhookWindowsHookEx(hCBTHook);
-	if(id == IDYES){
-		//LPSTR szCmd = GetCommandLine();
-		//WinExec(szCmd, SW_SHOW);
-		//return EXCEPTION_EXECUTE_HANDLER;
-		return EXCEPTION_CONTINUE_SEARCH;
-	} else if(id == IDNO){
-		// ∑µªÿ¥¶¿ÌΩ·π˚£¨ºÃ–¯÷¥––≥Ã–ÚªÚÕÀ≥ˆ
-		return ((exceptionInfo -> ExceptionRecord -> ExceptionFlags) & EXCEPTION_NONCONTINUABLE)?
-		EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_EXECUTION;
-	}
-	return EXCEPTION_EXECUTE_HANDLER;
-}
+    HANDLE hToken; OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken);
+    DWORD dwLength = 0; GetTokenInformation(hToken, TokenIntegrityLevel, NULL, 0, &dwLength);
+    PTOKEN_MANDATORY_LABEL pTIL = (PTOKEN_MANDATORY_LABEL)LocalAlloc(0, dwLength);
+    if (GetTokenInformation(hToken, TokenIntegrityLevel, pTIL, dwLength, &dwLength)) {
+        DWORD dwLevel = *GetSidSubAuthority(pTIL->Label.Sid, *GetSidSubAuthorityCount(pTIL->Label.Sid) - 1);
+        if (dwLevel >= SECURITY_MANDATORY_SYSTEM_RID) eLevel = RL_SYSTEM;
+        else if (dwLevel >= SECURITY_MANDATORY_HIGH_RID) eLevel = RL_ADMIN;
+        else eLevel = RL_USER;
+    } else eLevel = RL_UNKNOWN;
 
-inline void PrtError(LPCSTR szDes, LRESULT lResult) {
-	DWORD dwError = lResult == 0 ? GetLastError() : lResult & 0xFFFF;
-	LPSTR szError = NULL;
-	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-	              NULL, dwError, 0, (PTSTR)&szError, 0, NULL);
-	char s[BUFSIZ] = {};
-	sprintf(s, "%s£∫%u-%s", szDes, dwError, szError);
-	LocalFree(HLOCAL(szError));
-	size_t uSize = strlen(s);
-	//π˝¬Àƒ©Œ≤ªª––∑˚
-	if(*(s+uSize-1) == '\n')*(WORD*)(s+uSize-2) = 0;
-	Println(s);
-}
+    int argc; bool bStartAsSystem = false;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (argv) { bStartAsSystem = (!_wcsicmp(argv[1], L"-s") || !_wcsicmp(argv[1], L"/s")); LocalFree(argv); }
+    if (eLevel != RL_SYSTEM && bStartAsSystem) {
+        EnableDebugPrivilege();
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("lsass.exe"));
+        if (!hProcess) hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("winlogon.exe"));
+        HANDLE hTokenx, hTokenDup; OpenProcessToken(hProcess, TOKEN_DUPLICATE, &hTokenx);
+        DuplicateTokenEx(hTokenx, MAXIMUM_ALLOWED, NULL, SecurityIdentification, TokenPrimary, &hTokenDup);
+        CloseHandle(hProcess); CloseHandle(hTokenx);
+        STARTUPINFOW si; PROCESS_INFORMATION pi; ZeroMemory(&si, sizeof(STARTUPINFOW)); si.cb = sizeof(STARTUPINFOW);
+        GetStartupInfoW(&si);
+        BOOL bResult = CreateProcessWithTokenW(hTokenDup, LOGON_NETCREDENTIALS_ONLY, NULL, GetCommandLineW(), NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
+        error = GetLastError(); CloseHandle(hTokenDup);
+        if (bResult) return 0;
+        else MessageBox(NULL, "Êó†Ê≥ï‰ª•Á≥ªÁªüÊùÉÈôêËøêË°åÔºåÂ∞Ü‰ª•ÊôÆÈÄöÊñπÂºèËøêË°å„ÄÇÊ¨≤Áü•ËØ¶ÁªÜ‰ø°ÊÅØËØ∑Êü•Áúã‰∏ä‰∏ÄÊ¨°ÈîôËØØ", "ÊûÅÂüüÂ∑•ÂÖ∑ÂåÖ", MB_ICONERROR | MB_OK);
+    }
 
-inline LPSTR FormatLogTime(){
-	//…Í«Îƒ⁄¥Ê£¨ªÒµ√ ±º‰
-	LPVOID lpBuffer = VirtualAlloc(NULL, 64, MEM_COMMIT, PAGE_READWRITE);
-	SYSTEMTIME time;
-	GetLocalTime(&time);
-	LPSTR szBuffer = LPSTR(lpBuffer);
-	//∏Ò ΩªØ
-	sprintf(szBuffer, "[%04d-%02d-%02d %02d:%02d:%02d.%03d] ", 
-		time.wYear, time.wMonth, time.wDay,
-		time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
-	return szBuffer;
+    WNDCLASSEX wc; MSG msg; memset(&wc, 0, sizeof(wc));
+    wc.cbSize = sizeof(WNDCLASSEX); wc.lpfnWndProc = WndProc; wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW); wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
+    wc.lpszClassName = "WindowClass"; wc.hIcon = LoadIcon(hInstance, "MAINICON"); wc.hIconSm = LoadIcon(hInstance, "MAINICON");
+    if (!RegisterClassEx(&wc)) { MessageBox(NULL, "Á™óÂè£Á±ªÊ≥®ÂÜåÂ§±Ë¥•ÔºÅËØ∑ÈáçËØï", "ÊûÅ Âüü Â∑• ÂÖ∑ ÂåÖ", MB_ICONEXCLAMATION | MB_OK); return 0; }
+
+    hwnd = CreateWindowEx(WS_EX_CLIENTEDGE, "WindowClass", RandomWindowTitle(), (WS_OVERLAPPEDWINDOW | WS_VISIBLE) ^ WS_MAXIMIZEBOX ^ WS_SIZEBOX, 0, 0, width, height, NULL, NULL, hInstance, NULL);
+    if (hwnd == NULL) { MessageBox(NULL, "Á™óÂè£ÂàõÂª∫Â§±Ë¥•ÔºÅËØ∑ÈáçËØï", "ÊûÅ Âüü Â∑• ÂÖ∑ ÂåÖ", MB_ICONEXCLAMATION | MB_OK); return 0; }
+
+    ShowWindow(hwnd, nCmdShow); UpdateWindow(hwnd);
+    InitLogFile();
+    if (!CreateFloatingWindow(hInstance)) MessageBox(NULL, "ÊÇ¨ÊµÆÁ™óÂàõÂª∫Â§±Ë¥•ÔºÅ", "ÊûÅÂüüÂ∑•ÂÖ∑ÂåÖ", MB_ICONERROR | MB_OK);
+
+    while (GetMessage(&msg, NULL, 0, 0) > 0) { if (!IsDialogMessage(hwnd, &msg)) { TranslateMessage(&msg); DispatchMessage(&msg); } }
+    return msg.wParam;
 }

@@ -1,67 +1,112 @@
 # MythwareToolkit
 
+> 基于 [BengbuGuards/MythwareToolkit](https://github.com/BengbuGuards/MythwareToolkit) 源码进行 AI+人工修改，在此感谢原作者！
+
+> **[更新日志](CHANGELOG.md)** — 查看 v2.0.0 所有改动
+
 极域工具包，支持多种控制极域以及学生机房管理助手的工具。StudentMain、Mythware、Jiyu
 
 ![截图](https://img-blog.csdnimg.cn/60d799d3637b4fe8a99c295a6bad605b.png#pic_center)
 
-截图（1.2.1）
+截图（v1.2.1，新版本 UI 已重新设计）
 
-如果喜欢本项目，给个star可以吗？￣へ￣
+**当前版本：v2.0.0**
 
-欢迎访问[原理介绍博客](https://blog.csdn.net/weixin_42112038/article/details/125346545)，欢迎关注！
+---
+
+## v2.0.0 新增
+
+- **圆形悬浮窗**：始终置顶，左键切换主面板，**中键一键广播窗口化**，右键快捷菜单，支持拖拽
+- **UI 重设计**：640×380 宽敞布局，左右分栏，按钮不再拥挤
+- **日志自动落盘**：每次运行自动写入 `%TEMP%\MythwareToolkit.log`
+- **代码重构**：1623 行 main.cpp 拆分为 9 个独立模块，UTF-8 编码
+- **默认行为**：解鼠标锁、解键盘锁启动即生效
+- **状态栏**：显示极域版本号
+- **编译**：支持 CMake + Makefile + build.bat 三种方式
+
+---
 
 ## 功能
-
-注：以下*斜体标注*的内容表示即将到来的功能
-
-**README适应版本：v1.2.5**
 
 ### 极域控制
 
 - 支持不依赖`taskkill`、`ntsd`等工具杀掉极域。极域未运行时可启动极域，降权到登录用户（路径来自注册表）
-- 显示极域存活状态：未运行/正常运行/已挂起/无响应 + PID
-- 解除极域网络限制功能（黑/白名单或是直接禁用，下面这些解禁功能一般都是仅对2016版有效，可验证至2021版）
-- 解除极域U盘限制功能，有两种方式（软解禁若崩溃，使用硬解禁）
-- 窗口化/全屏化极域广播
+- 显示极域存活状态：未运行/正常运行/已挂起/无响应 + PID + 版本号
+- 解除极域网络限制（黑/白名单或直接禁用，2016版测试通过，可验证至2021版）
+- 解除极域U盘限制，两种方式（软解禁 / 硬解禁）
+- 窗口化/全屏化极域广播（悬浮窗右键菜单或中键一键操作）
 - 挂起（冻结）/恢复极域
-- 解鼠标限制，例如屏幕广播时的鼠标锁和机房管理助手蓝屏时的鼠标活动范围限制（教师端的远程控制依然有效）
-- 支持解极域键盘锁，可以解锁<kbd>Alt</kbd>+<kbd>Ctrl</kbd>+<kbd>Delete</kbd>
-- 防止截屏功能，可以防止教师端看到本程序（旧版本Windows看到黑框，新版本则是会看到后面的内容）
+- 解鼠标限制、键盘锁（启动默认开启）
+- 防止截屏（Win7+），防止教师端看到本程序
 
 ### 学生机房管理助手控制
 
-- 支持关闭6.8-12.99版本的学生机房管理助手（其中某些版本可能不能正常工作，但是依然可以利用快捷键清除漏网之鱼）
-- 计算9.x~12.0版本的临时密码，可替代普通密码，适用于无法在机房运行本程序的情况（提前记录好密码供使用，算法见下）
-- 可以解除cmd（命令提示符）、注册表编辑器、任务管理器、注销、管理控制台、taskkill等程序，还可以解禁几个浏览器的下载限制，解禁Chrome恐龙游戏和Edge冲浪游戏，以及Win7系统自带的一些游戏。
-- 新版本机房助手会禁用Tab键，请在使用“解禁系统程序”功能后注销重登，才能解锁（一般此操作不会触发系统还原，但别忘了重新打开本软件）。
-- 可以重启资源管理器（explorer.exe）
+- 支持关闭 v6.8 ~ v12.99 版本的学生机房管理助手
+- 计算 v9.x ~ v12.0 临时密码（动态密码计算器）
+- 一键解禁系统程序：CMD、注册表编辑器、任务管理器、浏览器下载限制、小游戏等
+- 重启资源管理器（explorer.exe）
 
 ### 通用功能
 
-- 内置MeltdownDFC、crdisk两个解除硬盘保护的软件
+- 内置 MeltdownDFC、crdisk 两个解除硬盘保护的工具
 - 快捷键：
-	- <kbd>Alt</kbd>+双击<kbd>C</kbd>强制结束当前程序（可用于对付机房助手）
-	- <kbd>Alt</kbd>+<kbd>B</kbd>显示程序主界面（也可以从托盘小图标启动）
-	- <kbd>Alt</kbd>+<kbd>W</kbd>最小化当前窗口
-- 支持启动任务管理器，自动“置于顶层”。
-- 支持超级置顶（UIAccess），可以覆盖任务管理器和放大镜。
+  - <kbd>Alt</kbd>+双击<kbd>C</kbd> — 强制结束当前程序
+  - <kbd>Alt</kbd>+<kbd>B</kbd> — 唤起主界面
+  - <kbd>Alt</kbd>+<kbd>W</kbd> — 最小化当前窗口
+- 支持超级置顶（UIAccess），覆盖任务管理器和放大镜
+- 鼠标移至屏幕左上角/右上角弹窗操作
+- 托盘图标常驻，最小化不占任务栏
 
-#### 重要提醒！！！
+---
 
-若出现“从服务器返回了一个参照”的弹窗，请下载存储库中`RootCA.reg`文件导入即可。如果在您的设备中没有超级置顶，可以改**组策略：计算机配置→Windows 设置→安全设置→本地策略→安全选项→用户帐户控制: 仅提升已签名和验证的可执行文件**，改成禁用。
+## 编译
 
-不导入根证书的做法是关闭UAC。对于安装了机房管理助手的设备，UAC应当处于关闭状态。
+### 方式一：build.bat（最简单）
 
-<details>
-<summary>查看图片</summary>
+```batch
+build.bat
+```
 
-![1](https://img-blog.csdnimg.cn/3bf026b7cf14411fa15c83fee47cf771.png)
+自动检测 `D:\Dev\mingw64` / `C:\mingw64` / `C:\msys64\mingw64` / PATH 中的 MinGW64。
 
-![2](https://img-blog.csdnimg.cn/8065bc909c2148dd8039b67343cc2fc5.png)
+### 方式二：CMake
 
-</details>
+```bash
+cmake -B build -G "MinGW Makefiles"
+cmake --build build
+```
 
-- 当勾选“启用鼠标检测弹窗”选项后，鼠标移至屏幕左上角时，可以选择最小化当前的焦点窗口，与解键盘锁结合就可以实现脱离黑屏；移至右上角时，可以选择关闭当前焦点窗口，类似于<kbd>Alt</kbd>+<kbd>F4</kbd>效果。还有强制关闭窗口功能（即强制关闭：禁用关闭窗口、屏蔽<kbd>Alt</kbd>+<kbd>F4</kbd>的窗口，对UWP应用无效）
+### 方式三：Makefile
+
+```bash
+mingw32-make
+```
+
+### 依赖
+
+- [MinGW64](https://github.com/niXman/mingw-builds-binaries)（x86_64-XX.X.X-release-win32-seh-ucrt）
+- GDI+（系统自带）
+
+---
+
+## 部署
+
+exe 需要 `uiAccess="true"`（超级置顶），因此需要数字签名。项目提供签名脚本：
+
+```powershell
+# 在项目目录下以管理员 PowerShell 运行
+.\sign.ps1
+```
+
+签名后复制到 `C:\Program Files\MythwareToolkit\` 即可运行。导出证书 `bin\mythware.cer` 可在其他电脑上导入：
+
+```powershell
+certutil -addstore Root mythware.cer
+```
+
+如果不需要超级置顶（只超越普通窗口，不超越任务管理器），将 `sys.manifest` 中 `uiAccess="true"` 改为 `"false"` 重新编译，exe 可在任意位置直接双击运行。
+
+---
 
 ## 附录
 
@@ -69,47 +114,45 @@
 
 ### 防止教师端强制关机
 
-只需删除极域目录下的Shutdown.exe即可。此后工具包将对这些远控操作做专门的预防
+删除极域目录下的 `Shutdown.exe` 即可。
 
-### 使用命令行或PowerShell手动解除极域U盘限制
+### 命令行解除极域U盘限制
 
 CMD：
-
 ```powershell
 sc stop TDFileFilter
-sc delete TDFileFilter #可选
+sc delete TDFileFilter
 ```
 
-PowerShell：（适用于CMD被禁用情况）
-
+PowerShell（CMD被禁用时）：
 ```powershell
 cd C:\Windows\System32\
 .\sc.exe stop TDFileFilter
-.\sc.exe delete TDFileFilter #可选
+.\sc.exe delete TDFileFilter
 ```
 
-### 学生机房管理助手的软件黑名单（10.1版本）
+### 学生机房管理助手的软件黑名单（v10.1）
 
-进程名包含这些词就会蓝屏（加粗的名字不仅匹配进程名，还匹配窗口名）：
+进程名包含这些词就会蓝屏（加粗的匹配进程名+窗口名）：
 
-vmware、VirtualBox、Virtual PC、**虚拟机**、**电子教室**、ProcView、IceSword、Procmast.exe、**toolkit_32-bits.exe**（有点搞笑，只捉按规范命名的32位程序，随便一改都搞得定）、rstray.exe、PFW.exe、FTCleaner.exe、Wsyscheck.exe、XueTr.exe、prom.exe、ProcessX.exe、pchunter、**Killer.exe**、procmgr.exe、ProcessHacker.exe、killcontrol、PowerTool32.exe、360taskmgr、YtWinAst、KVFWMain.exe、ECQ-PS.exe、SnipeSword、procexp、**MsgFlood.exe**、ProcessOVER、procdeal、**多桌面**、**任务管理**、**进程**、Prayaya、dexpot.exe、vdeskman.exe、mdesk.exe、**virtualdesk**、multideskt.exe、VirDsk.exe、IDesktop.exe、YtMDesk.exe、coon.exe、zmqh.exe、DexpotProPortable.exe、Desktops.exe、wisedesktop.exe、DESKTOP.exe、Vdesktop.exe、MagicDesktop.exe、multidesktop.exe、**weRs0cqa**（这个有特别关照，在蓝屏窗口加载时还会自动杀掉带有这个名字的进程）、RegWX64.exe、QQPCNetFlow.exe、BDMANetLimiter.exe、netmon.exe、360netman.exe、HelloTeacher.exe、EHacker.exe、PowerTool64.exe、zydesk.exe、perfmon.exe、**吾爱破解**、**极域**、prcview.exe、processlasso.exe、netfuke.exe、**去除控制**、**课堂狂欢器**、**课堂工具**、fuckmythware、SpecialSet.exe、JiYuTrainer.exe、skieskiller、WindowsKernelExplorer.exe、msconfig.exe、iu杀毒、**窗口拓印**
-。另外包括任务管理器，会有独特的锁定蓝屏界面。
+vmware、VirtualBox、Virtual PC、**虚拟机**、**电子教室**、ProcView、IceSword、Procmast.exe、**toolkit_32-bits.exe**、rstray.exe、PFW.exe、FTCleaner.exe、Wsyscheck.exe、XueTr.exe、prom.exe、ProcessX.exe、pchunter、**Killer.exe**、procmgr.exe、ProcessHacker.exe、killcontrol、PowerTool32.exe、360taskmgr、YtWinAst、KVFWMain.exe、ECQ-PS.exe、SnipeSword、procexp、**MsgFlood.exe**、ProcessOVER、procdeal、**多桌面**、**任务管理**、**进程**、Prayaya、dexpot.exe、vdeskman.exe、mdesk.exe、**virtualdesk**、multideskt.exe、VirDsk.exe、IDesktop.exe、YtMDesk.exe、coon.exe、zmqh.exe、DexpotProPortable.exe、Desktops.exe、wisedesktop.exe、DESKTOP.exe、Vdesktop.exe、MagicDesktop.exe、multidesktop.exe、**weRs0cqa**（蓝屏时还会自动杀掉该名进程）、RegWX64.exe、QQPCNetFlow.exe、BDMANetLimiter.exe、netmon.exe、360netman.exe、HelloTeacher.exe、EHacker.exe、PowerTool64.exe、zydesk.exe、perfmon.exe、**吾爱破解**、**极域**、prcview.exe、processlasso.exe、netfuke.exe、**去除控制**、**课堂狂欢器**、**课堂工具**、fuckmythware、SpecialSet.exe、JiYuTrainer.exe、skieskiller、WindowsKernelExplorer.exe、msconfig.exe、iu杀毒、**窗口拓印**
 
-### 助手临时密码算法（9.x至12.0）
+此外任务管理器会触发独特的锁定蓝屏界面。
 
-1. 10.0前：首位为8，后面为16 ×(年 × 91 + 月 × 13 + 日 × 57)
-2. 10.0~11.0：在上面一条的基础上+11
-3. 11.0~11.06的首个发布版：年 × 789 + 月 × 123 + 日 × 456 + 111
-4. 11.06的第三个发布版~12.0：（月 × 159 + 日 × 357 + 计算机名的末位字符的ASCII码 × 258）转换为7进制
+### 助手临时密码算法（v9.x ~ v12.0）
 
-使用本程序的计算器可直接计算结果。
+1. 10.0 前：首位为 8，后面为 `16 × (年 × 91 + 月 × 13 + 日 × 57)`
+2. 10.0 ~ 11.0：上面结果 +11
+3. 11.0 ~ 11.06 首个发布版：`年 × 789 + 月 × 123 + 日 × 456 + 111`
+4. 11.06 第三版 ~ 12.0：`(月 × 159 + 日 × 357 + 计算机名末位 ASCII × 258)` 转 7 进制
 
-### 在线根据明文生成学生机房管理助手密码（7.2版本以上，9.98以下）
+使用本程序的"动态密码计算器"可直接计算。
 
-访问[这个网站](https://try.dot.net/)，在代码运行窗口输入如下内容，便可生成密文，将密文写入注册表HKEY_CURRENT_USER\Software:n（REG_SZ），机房助手密码将会被立即更改：（也可以本地运行）
+### 在线生成机房助手密文（v7.2 ~ v9.98）
+
+访问 [try.dot.net](https://try.dot.net/)，运行以下 C# 代码，将输出写入注册表 `HKEY_CURRENT_USER\Software:n`（REG_SZ），机房助手密码立即更改：
 
 ```csharp
-// 代码来自学生机房管理助手9.0 set.exe，逆向、整理：小流汗黄豆
 using System;
 using System.Security.Cryptography;
 using System.Text;
@@ -117,50 +160,34 @@ using System.IO;
 
 public class Program
 {
-	public static void Main()
-	{
-		// 更改这里的内容
-		string string_3 = "12345678";
-		// Class6.smethod_0()
-		string value = "C:\\WINDOWS";
-		string s = value.Substring(0, 8);
-		string s2 = value.Substring(1, 8);
-		DESCryptoServiceProvider descryptoServiceProvider = new DESCryptoServiceProvider();
-		descryptoServiceProvider.Key = Encoding.UTF8.GetBytes(s);
-		descryptoServiceProvider.IV = Encoding.UTF8.GetBytes(s2);
-		MemoryStream memoryStream = new MemoryStream();
-		CryptoStream cryptoStream = new CryptoStream(memoryStream, descryptoServiceProvider.CreateEncryptor(), CryptoStreamMode.Write);
-		StreamWriter streamWriter = new StreamWriter(cryptoStream);
-		streamWriter.Write(string_3);
-		streamWriter.Flush();
-		cryptoStream.FlushFinalBlock();
-		memoryStream.Flush();
-		string string_4 = Convert.ToBase64String(memoryStream.GetBuffer(), 0, checked((int)memoryStream.Length));
-		// Class6.smethod_3()
-		StringBuilder stringBuilder = new StringBuilder();
-		for(int i = 0; i < string_4.Length; i++)
-			stringBuilder.Append((char)(string_4[i] - 10));
-		string_3 = stringBuilder.ToString();
-		// Class6.smethod_2()
-		MD5CryptoServiceProvider md5CryptoServiceProvider = new MD5CryptoServiceProvider();
-		byte[] array2 = md5CryptoServiceProvider.ComputeHash(Encoding.Default.GetBytes(string_3));
-		stringBuilder.Clear();
-		for (int i = 0; i < array2.Length; i++)
-			stringBuilder.Append(array2[i].ToString("x2"));
-		string str = stringBuilder.ToString().Substring(10);
-
-		Console.WriteLine(str);
-	}
+    public static void Main()
+    {
+        string string_3 = "12345678"; // 改成你的密码
+        string value = "C:\\WINDOWS";
+        string s = value.Substring(0, 8);
+        string s2 = value.Substring(1, 8);
+        DESCryptoServiceProvider desc = new DESCryptoServiceProvider();
+        desc.Key = Encoding.UTF8.GetBytes(s);
+        desc.IV = Encoding.UTF8.GetBytes(s2);
+        MemoryStream ms = new MemoryStream();
+        CryptoStream cs = new CryptoStream(ms, desc.CreateEncryptor(), CryptoStreamMode.Write);
+        StreamWriter sw = new StreamWriter(cs);
+        sw.Write(string_3); sw.Flush(); cs.FlushFinalBlock(); ms.Flush();
+        string enc = Convert.ToBase64String(ms.GetBuffer(), 0, (int)ms.Length);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < enc.Length; i++) sb.Append((char)(enc[i] - 10));
+        MD5CryptoServiceProvider md5 = new MD5CryptoServiceProvider();
+        byte[] hash = md5.ComputeHash(Encoding.Default.GetBytes(sb.ToString()));
+        sb.Clear();
+        for (int i = 0; i < hash.Length; i++) sb.Append(hash[i].ToString("x2"));
+        Console.WriteLine(sb.ToString().Substring(10));
+    }
 }
-// 期望输出：8a29cc29f5951530ac69f4，但是对于9.99以上版本为8a29cc29f5951530ac69需自己改
+// 期望输出：8a29cc29f5951530ac69f4（v9.99 以上为 8a29cc29f5951530ac69）
 ```
 
+### 重要提醒
+
+若出现"从服务器返回了一个参照"弹窗，导入项目中的 `RootCA.reg`（原版证书）或 `mythware.cer`（本版证书）。机房环境建议关闭 UAC。
+
 </details>
-
-## 开发
-
-鼓励大伙提出反馈和建议，也支持PR拉请求。
-
-编译：使用最新版本的MinGW64编译器（<https://github.com/niXman/mingw-builds-binaries>），从1.2.4版本起，不再提供Dev C++工程文件，全部使用Makefile编译，使用VS Code结合Makefile插件使用即可。
-
-另外：机房助手作者钟鸣，存在通过助手的木马广告非法获利（篡改浏览器主页至2345导航，一月获利以百元计）的行为。这可与其标榜的绿色无毒背道而驰了。
