@@ -1,2 +1,42 @@
-如果遇到双击是：“从服务器返回了一个参数”
-安装证书文件“mythware.cer”
+===========================================
+  "从服务器返回了一个参照" 弹窗解决方法
+===========================================
+
+【原因】
+Windows 要求 uiAccess="true" 的程序必须经过受信任的代码签名。
+如果证书未导入到"本地计算机\受信任的根证书颁发机构"，双击 exe 时
+就会弹出此错误。
+
+【方法一：一键部署（推荐）】
+以管理员身份运行 cert\deploy.bat，自动完成：
+  1. 复制 exe 到 C:\Program Files\MythwareToolkit\
+  2. 安装证书到受信任根
+  3. 创建桌面快捷方式
+
+【方法二：手动安装本版证书】
+以管理员身份运行 CMD：
+  certutil -addstore -f -enterprise Root cert\mythware.cer
+或 PowerShell（管理员）：
+  Import-Certificate -FilePath cert\mythware.cer -CertStoreLocation Cert:\LocalMachine\Root
+
+【方法三：导入原版注册表（兼容旧版）】
+双击 cert\RootCA.reg → 是 → 确定
+（适用于原版 BengbuGuards 签名的 exe）
+
+【方法四：通过 MMC 手动导入】
+  1. Win+R → mmc → 确定
+  2. 文件 → 添加/删除管理单元 → 证书 → 添加 → 计算机账户 → 本地计算机
+  3. 展开"受信任的根证书颁发机构" → 证书
+  4. 右键 → 所有任务 → 导入 → 选择 cert\mythware.cer
+  5. 一直下一步直到完成
+
+【验证】
+导入成功后，在 CMD 中运行：
+  certutil -store Root | findstr Mythware
+看到 "MythwareToolkit" 即表示成功。
+
+【注意】
+- 如仍无法运行，确认 exe 位于 C:\Program Files\MythwareToolkit\ 下
+- 机房环境建议关闭 UAC（控制面板 → 用户账户控制 → 从不通知）
+- 也可直接用便携版 bin\MythwareToolkit_Portable.exe，免签名免安装
+  （编译方式：scripts\build_portable.bat）
