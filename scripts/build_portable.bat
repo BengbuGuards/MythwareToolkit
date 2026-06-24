@@ -15,7 +15,7 @@ for %%d in (
     "C:\Program Files (x86)\mingw64"
 ) do (
     if exist "%%~d\bin\g++.exe" (
-        set MINGW=%%~d\bin
+        set "MINGW=%%~d\bin"
         goto :found
     )
 )
@@ -26,7 +26,7 @@ echo ERROR: MinGW64 not found!
 pause & exit /b 1
 
 :found
-if defined MINGW (set CXX=%MINGW%\g++ & set WR=%MINGW%\windres) else (set CXX=g++ & set WR=windres)
+if defined MINGW (set "CXX=%MINGW%\g++" & set "WR=%MINGW%\windres") else (set CXX=g++ & set WR=windres)
 echo MinGW: %MINGW%
 if not exist %OUTDIR% mkdir %OUTDIR%
 
