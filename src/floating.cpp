@@ -41,6 +41,7 @@ static void LoadFloatingImage(HINSTANCE hInst) {
 
     IStream* pStream = NULL;
     CreateStreamOnHGlobal(hGlobal, TRUE, &pStream);
+    if (!pStream) return;
     g_pBitmap = Gdiplus::Bitmap::FromStream(pStream);
     pStream->Release();
 }
