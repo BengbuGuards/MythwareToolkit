@@ -17,8 +17,8 @@ MythwareToolkit/
 ├── src/          ← 源码（9个 .cpp）
 ├── include/      ← 头文件（4个 .h）
 ├── res/          ← 资源（图标/图片/manifest/嵌入式exe）
-├── scripts/      ← 编译脚本（build.bat / build_portable.bat / sign.ps1）
-├── cert/         ← 证书 + 部署（deploy.bat / mythware.cer / RootCA.reg）
+├── scripts/      ← 编译 + 签名（build.bat / build_portable.bat / sign.bat / sign.ps1）
+├── cert/         ← 证书 + 部署（deploy.bat / mythware.cer / RootCA.reg / 故障排查）
 ├── bin/          ← 编译输出（不入仓）
 ├── Makefile
 ├── README.md
@@ -35,7 +35,7 @@ MythwareToolkit/
 - **代码重构**：1623 行 main.cpp 拆分为 9 个独立模块，UTF-8 编码
 - **默认行为**：解鼠标锁、解键盘锁启动即生效
 - **状态栏**：显示极域版本号
-- **编译**：支持 CMake + Makefile + build.bat 三种方式
+- **编译**：`build.bat` 一键编译 + `sign.bat` 一键签名，也支持 Makefile
 
 ---
 
@@ -72,66 +72,74 @@ MythwareToolkit/
 
 ---
 
-## 编译
+## 快速开始
 
-### 方式一：build.bat（最简单）
+### UIAccess 完整版（超级置顶）
+
+三步走，全部双击运行：
 
 ```batch
-scripts\build.bat          → bin\MythwareToolkit.exe       （UIAccess 完整版，需签名+安装）
-scripts\build_portable.bat → bin\MythwareToolkit_Portable.exe （便携版，免签名免安装）
+scripts\build.bat    →  编译（自动检测 MinGW64）
+scripts\sign.bat     →  签名 + 安装证书（自动提权）
+cert\deploy.bat      →  部署到 C:\Program Files\
 ```
 
-双击即可运行。自动检测 `D:\Dev\mingw64` / `C:\mingw64` / `C:\msys64\mingw64` / PATH 中的 MinGW64。
+| 脚本 | 做什么 | 输出 |
+|------|--------|------|
+| `scripts\build.bat` | 编译 9 个源文件 + 资源 | `bin\MythwareToolkit.exe` |
+| `scripts\sign.bat` | 生成证书 → 安装到受信任根 → 签名 EXE | `cert\mythware.cer` + 已签名 EXE |
+| `cert\deploy.bat` | 复制到 Program Files + 装证书 + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
 
-两个版本的区别：
-- **build.bat** — `uiAccess="true"`，超级置顶（覆盖任务管理器），需签名后安装到 `C:\Program Files\`
-- **build_portable.bat** — `uiAccess="false"`，免签名，U盘即插即用，牺牲超级置顶能力
+### 便携版（免签名免安装）
 
-### 方式二：Makefile
+一步搞定：
 
-```bash
-make          # UIAccess 版
-make portable # 便携版
+```batch
+scripts\build_portable.bat
 ```
+
+输出 `bin\MythwareToolkit_Portable.exe`，U 盘即插即用，双击即可运行。
+
+> 便携版牺牲超级置顶能力（不能覆盖任务管理器），但无需签名和安装。
+
+### 两个版本的区别
+
+| | UIAccess 版 | 便携版 |
+|------|------------|--------|
+| 构建 | `build.bat` | `build_portable.bat` |
+| uiAccess | `true`（超级置顶） | `false`（普通置顶） |
+| 签名 | 需要（`sign.bat`） | 不需要 |
+| 安装位置 | `C:\Program Files\` | 任意位置 |
+| 悬浮窗 | GDI+ 圆形裁剪 + 抗锯齿 | 同左 |
 
 ### 依赖
 
 - [MinGW64](https://github.com/niXman/mingw-builds-binaries)（x86_64-XX.X.X-release-win32-seh-ucrt）
-- GDI+（系统自带）
+- GDI+（Windows 自带）
+
+Makefile 也支持：`make` / `make portable`。
 
 ---
 
-## 部署
+## 故障排查
 
-### UIAccess 完整版
+### "从服务器返回了一个参照" 弹窗
 
-1. 运行 `scripts\build.bat` 编译
-2. 以管理员 PowerShell 运行签名脚本：
-   ```powershell
-   powershell -File scripts\sign.ps1
-   ```
-3. 部署（复制到 Program Files + 安装证书 + 创建快捷方式）：
-   ```batch
-   cert\deploy.bat
-   ```
+UIAccess 程序必须**同时满足**两个条件：EXE 已签名 **且** 证书受信任。只装证书不签名无效！
 
-### 便携版
+**正确做法：** 运行 `scripts\sign.bat`（一步完成签名+装证书），而不是只导入 `cert\mythware.cer`。
 
-直接编译 `scripts\build_portable.bat`，输出 `bin\MythwareToolkit_Portable.exe` 可在任意位置双击运行，无需签名和安装。
-
-### 证书安装（解决"从服务器返回了一个参照"弹窗）
-
-如果遇到弹窗报错，导入证书即可：
-
+如果已签名但证书问题：
 ```batch
-cert\deploy.bat    # 一键部署（推荐）
-:: 或手动导入
-certutil -addstore -f -enterprise Root cert\mythware.cer
-:: 或导入注册表
-cert\RootCA.reg
+certutil -addstore -f -enterprise Root cert\mythware.cer   :: 手动装证书
+cert\RootCA.reg                                              :: 或导入注册表
 ```
 
-以上文件均在 `cert\` 目录下。
+详见 `cert\从服务器返回一个参数解决方法.txt`。
+
+### 崩溃 / 0xC0000005
+
+请确认使用的是最新代码。此问题已在 v2.0 中修复（添加了 COM 初始化 + GDI+ 悬浮窗）。
 
 ---
 
@@ -215,6 +223,6 @@ public class Program
 
 ### 重要提醒
 
-若出现"从服务器返回了一个参照"弹窗，导入 `cert\RootCA.reg`（原版证书）或 `cert\mythware.cer`（本版证书），或直接运行 `cert\deploy.bat`。机房环境建议关闭 UAC。
+若出现"从服务器返回了一个参照"弹窗，说明 EXE 未签名或证书未安装。运行 `scripts\sign.bat` 一步解决。或手动导入 `cert\RootCA.reg`（原版证书）/ `cert\mythware.cer`（本版证书）。详见 `cert\从服务器返回一个参数解决方法.txt`。机房环境建议关闭 UAC。
 
 </details>
