@@ -113,7 +113,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             EnableDebugPrivilege();
             w = GetSystemMetrics(SM_CXSCREEN) - 1; h = GetSystemMetrics(SM_CYSCREEN) - 1;
             WM_TASKBAR = RegisterWindowMessage("TaskbarCreated");
+#ifndef UIACCESS_BUILD
             thread = CreateThread(NULL, 0, ThreadProc, NULL, 0, NULL);
+#endif
             keyHook = CreateThread(NULL, 0, KeyHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
             mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
             SetTimer(hwnd, 1, 1000, NULL); SetTimer(hwnd, 2, 2000, NULL);
@@ -242,7 +244,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                 case 1012: { LRESULT check = SendMessage(BtWnd, BM_GETCHECK, 0, 0); ask = check == BST_CHECKED; break; }
                 case 1014: ToggleBroadcastWindow(); UpdateMythwareStatus(); break;
                 case 1015: ShowPsdWnd(); break;
-                case 1016: { LRESULT check = SendMessage(BtTop, BM_GETCHECK, 0, 0); if (check == BST_CHECKED) ResumeThread(thread); else { SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE); SuspendThread(thread); } break; }
+                case 1016: {
+    LRESULT check = SendMessage(BtTop, BM_GETCHECK, 0, 0);
+    if (check == BST_CHECKED) {
+#ifndef UIACCESS_BUILD
+        ResumeThread(thread);
+#endif
+    } else {
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+#ifndef UIACCESS_BUILD
+        SuspendThread(thread);
+#endif
+    }
+    break;
+}
                 case 1017: { LRESULT check = SendMessage(BtCur, BM_GETCHECK, 0, 0); if (check == BST_CHECKED) ResumeThread(mouHook); else { SuspendThread(mouHook); UnhookWindowsHookEx(mseHook); } break; }
                 case 1018: {
                     LRESULT check = SendMessage(BtKbh, BM_GETCHECK, 0, 0);
@@ -289,7 +304,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
         case WM_DESTROY:
             CloseLogFile();
             UnregisterHotKey(hwnd, 0); UnregisterHotKey(hwnd, 1); UnregisterHotKey(hwnd, 2);
-            CloseHandle(thread); CloseHandle(keyHook); CloseHandle(mouHook);
+#ifndef UIACCESS_BUILD
+            CloseHandle(thread);
+#endif
+            CloseHandle(keyHook); CloseHandle(mouHook);
             Shell_NotifyIcon(NIM_DELETE, &icon); UnhookWindowsHookEx(mseHook); UnhookWindowsHookEx(kbdHook);
             break;
 
@@ -329,9 +347,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                         HMENU hSplitMenu = CreatePopupMenu();
                         AppendMenu(hSplitMenu, MF_BYPOSITION, 1, (mwSts != 1) ? "挂起极域" : "恢复极域");
                         EnableMenuItem(hSplitMenu, 1, mwSts != 2 ? MF_ENABLED : MF_GRAYED);
+#ifndef UIACCESS_BUILD
                         SuspendThread(thread);
+#endif
                         int i = TrackPopupMenuProtected(hSplitMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, ptBtn.x, ptBtn.y, hwnd);
+#ifndef UIACCESS_BUILD
                         ResumeThread(thread);
+#endif
                         if (i == 1) { BOOL sts = SuspendProcess(GetProcessIDFromName(MythwareFilename), !mwSts); SetWindowText(TxOut, sts ? "挂起/恢复成功" : "挂起/恢复失败"); UpdateMythwareStatus(); }
                         return TRUE;
                     }
@@ -362,6 +384,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             return DefWindowProc(hwnd, Message, wParam, lParam);
 
         case WM_SIZE: if (wParam == SIZE_MINIMIZED) { ShowWindow(hwnd, SW_HIDE); return TRUE; } break;
+
+        case WM_WINDOWPOSCHANGED: {
+            // 事件驱动置顶：仅当其他窗口把本窗口挤下去时才重新置顶，避免无意义轮询
+            WINDOWPOS* wp = (WINDOWPOS*)lParam;
+            if (!(wp->flags & SWP_NOZORDER) && IsWindowVisible(hwnd)) {
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
+            return DefWindowProc(hwnd, Message, wParam, lParam);
+        }
 
         default: if (Message == WM_TASKBAR) Shell_NotifyIcon(NIM_ADD, &icon); return DefWindowProc(hwnd, Message, wParam, lParam);
     }

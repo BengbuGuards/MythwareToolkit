@@ -7,7 +7,8 @@ WINDRES  = windres
 RM       = del /q /f
 
 # Compiler / linker flags
-CXXFLAGS = -O3 -pipe -lntdll -fexec-charset=UTF-8 -Iinclude
+CXXFLAGS = -O3 -pipe -lntdll -fexec-charset=UTF-8 -Iinclude -DUIACCESS_BUILD
+CXXFLAGS_P = -O3 -pipe -lntdll -fexec-charset=UTF-8 -Iinclude
 LFLAGS   = -s -mwindows -lcomctl32 -lole32 -loleaut32 -luuid -static
 LFLAGS_P = -s -mwindows -lcomctl32 -lgdi32 -static
 
@@ -35,7 +36,7 @@ $(BIN): $(OBJS) $(RES)
 # ── Portable build ──────────────────────────────────────────
 portable: res/sys.manifest
 	copy /Y res\sys_portable.manifest res\sys.manifest >nul
-	$(MAKE) BIN=$(BIN_P) LFLAGS="$(LFLAGS_P)" _build_portable
+	$(MAKE) BIN=$(BIN_P) LFLAGS="$(LFLAGS_P)" CXXFLAGS="$(CXXFLAGS_P)" _build_portable
 	copy /Y res\sys_original.manifest res\sys.manifest >nul
 
 _build_portable: $(OBJS) $(RES)
