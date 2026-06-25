@@ -24,7 +24,8 @@ if exist "%HERE%MythwareToolkit.exe" (
 )
 if not defined EXE (
     echo [ERROR] MythwareToolkit.exe not found!
-    echo   Put deploy.bat next to MythwareToolkit.exe, or build first.
+    echo   Tried: "%HERE%MythwareToolkit.exe"
+    echo   Tried: "%HERE%..\bin\MythwareToolkit.exe"
     pause
     exit /b 1
 )
