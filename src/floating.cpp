@@ -1,95 +1,74 @@
 #include "floating.h"
-#include <olectl.h>
+#include <gdiplus.h>
 
 #define FLOAT_SIZE  33
 
-static HWND     g_hFloating = NULL;
-static HBITMAP  g_hBitmap   = NULL;
-static HICON    g_hFallback = NULL;
-static POINT    g_dragBase;
-static RECT     g_dragStartRect;
-static bool     g_dragging = false;
-static bool     g_hovered  = false;
+static HWND             g_hFloating     = NULL;
+static Gdiplus::Bitmap* g_pBitmap       = NULL;
+static HICON            g_hFallback     = NULL;
+static POINT            g_dragBase;
+static RECT             g_dragStartRect;
+static bool             g_dragging      = false;
+static bool             g_hovered       = false;
+static ULONG_PTR        g_gdiToken      = 0;
+static bool             g_gdiOk         = false;
 
-// ── OleLoadPicture 加载 JPG（不依赖 GDI+）───────────────────
-static HBITMAP LoadJpegFromResource(HINSTANCE hInst) {
+// ── GDI+ 初始化（延迟调用，仅一次）──────────────────────────
+static void InitGDIPlus() {
+    if (g_gdiToken) return;
+    Gdiplus::GdiplusStartupInput si;
+    g_gdiOk = (Gdiplus::GdiplusStartup(&g_gdiToken, &si, NULL) == Gdiplus::Ok);
+}
+
+// ── 从资源加载 JPG（GDI+）───────────────────────────────────
+static void LoadFloatingImage(HINSTANCE hInst) {
+    if (g_pBitmap) return;
+    InitGDIPlus();
+    if (!g_gdiOk) return;
+
     HRSRC   hRes = FindResource(hInst, MAKEINTRESOURCE(4), RT_RCDATA);
-    if (!hRes) return NULL;
+    if (!hRes) return;
     HGLOBAL hData = LoadResource(hInst, hRes);
     DWORD   dwSize = SizeofResource(hInst, hRes);
     LPVOID  pData = LockResource(hData);
-    if (!pData) return NULL;
+    if (!pData) return;
 
     HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, dwSize);
-    if (!hGlobal) return NULL;
+    if (!hGlobal) return;
     void* pMem = GlobalLock(hGlobal);
     memcpy(pMem, pData, dwSize);
     GlobalUnlock(hGlobal);
 
     IStream* pStream = NULL;
     CreateStreamOnHGlobal(hGlobal, TRUE, &pStream);
-    if (!pStream) return NULL;
-
-    IPicture* pPic = NULL;
-    HRESULT hr = OleLoadPicture(pStream, dwSize, FALSE, IID_IPicture, (void**)&pPic);
+    g_pBitmap = Gdiplus::Bitmap::FromStream(pStream);
     pStream->Release();
-    if (FAILED(hr) || !pPic) return NULL;
-
-    HBITMAP hBmp = NULL;
-    pPic->get_Handle((OLE_HANDLE*)&hBmp);
-    if (hBmp) {
-        // 复制一份，因为 IPicture 释放时会销毁原图
-        HDC hdc = GetDC(NULL);
-        HDC hdcMem1 = CreateCompatibleDC(hdc);
-        HDC hdcMem2 = CreateCompatibleDC(hdc);
-        BITMAP bm;
-        GetObject(hBmp, sizeof(bm), &bm);
-        HBITMAP hCopy = CreateCompatibleBitmap(hdc, bm.bmWidth, bm.bmHeight);
-        SelectObject(hdcMem1, hBmp);
-        SelectObject(hdcMem2, hCopy);
-        BitBlt(hdcMem2, 0, 0, bm.bmWidth, bm.bmHeight, hdcMem1, 0, 0, SRCCOPY);
-        DeleteDC(hdcMem1);
-        DeleteDC(hdcMem2);
-        ReleaseDC(NULL, hdc);
-        hBmp = hCopy;
-    }
-    pPic->Release();
-    return hBmp;
 }
 
+// ── 绘制悬浮窗内容 ──────────────────────────────────────────
 static void DrawFloatingContent(HDC hdc) {
     RECT rc = {0, 0, FLOAT_SIZE, FLOAT_SIZE};
 
-    if (g_hBitmap) {
-        // 画图片（缩放填充）
-        HDC memDC = CreateCompatibleDC(hdc);
-        SelectObject(memDC, g_hBitmap);
-        BITMAP bm; GetObject(g_hBitmap, sizeof(bm), &bm);
-        SetStretchBltMode(hdc, HALFTONE);
-        StretchBlt(hdc, 0, 0, FLOAT_SIZE, FLOAT_SIZE, memDC, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
-        DeleteDC(memDC);
-    } else if (g_hFallback) {
-        // 回退到应用图标
+    if (g_gdiOk && g_pBitmap) {
+        Gdiplus::Graphics gfx(hdc);
+        gfx.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+        gfx.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+        Gdiplus::GraphicsPath path;
+        path.AddEllipse(0, 0, FLOAT_SIZE - 1, FLOAT_SIZE - 1);
+        gfx.SetClip(&path);
+        gfx.DrawImage(g_pBitmap, 0, 0, FLOAT_SIZE, FLOAT_SIZE);
+        if (g_hovered) {
+            Gdiplus::SolidBrush hl(Gdiplus::Color(30, 255, 255, 255));
+            gfx.FillEllipse(&hl, 0, 0, FLOAT_SIZE - 1, FLOAT_SIZE - 1);
+        }
+    } else {
+        // 回退：画应用图标
         COLORREF bg = g_hovered ? RGB(80, 80, 90) : RGB(60, 60, 70);
         HBRUSH hBg = CreateSolidBrush(bg);
         FillRect(hdc, &rc, hBg);
         DeleteObject(hBg);
-        DrawIconEx(hdc, 4, 4, g_hFallback, FLOAT_SIZE - 8, FLOAT_SIZE - 8, 0, NULL, DI_NORMAL);
-    }
-
-    // 悬停高亮
-    if (g_hovered) {
-        HBRUSH hHl = CreateSolidBrush(RGB(60, 60, 70));
-        HRGN hRgn = CreateEllipticRgn(0, 0, FLOAT_SIZE, FLOAT_SIZE);
-        SelectClipRgn(hdc, hRgn);
-        // 半透明做不到纯 GDI，画个淡色边框代替
-        HPEN hPen = CreatePen(PS_SOLID, 2, RGB(140, 160, 200));
-        SelectObject(hdc, hPen);
-        SelectObject(hdc, GetStockObject(NULL_BRUSH));
-        Ellipse(hdc, 1, 1, FLOAT_SIZE - 1, FLOAT_SIZE - 1);
-        DeleteObject(hPen);
-        DeleteObject(hRgn);
-        DeleteObject(hHl);
+        if (g_hFallback)
+            DrawIconEx(hdc, 4, 4, g_hFallback, FLOAT_SIZE - 8, FLOAT_SIZE - 8, 0, NULL, DI_NORMAL);
     }
 }
 
@@ -98,7 +77,8 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
         case WM_CREATE: {
             CREATESTRUCT* cs = (CREATESTRUCT*)lParam;
             g_hFallback = LoadIcon(cs->hInstance, "MAINICON");
-            g_hBitmap = LoadJpegFromResource(cs->hInstance);
+            InitGDIPlus();
+            if (g_gdiOk) LoadFloatingImage(cs->hInstance);
             HRGN hRgn = CreateEllipticRgn(0, 0, FLOAT_SIZE + 1, FLOAT_SIZE + 1);
             SetWindowRgn(hWnd, hRgn, TRUE);
             SetTimer(hWnd, 1, 400, NULL);
@@ -109,7 +89,8 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             break;
         }
         case WM_TIMER:
-            SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             break;
         case WM_PAINT: {
             PAINTSTRUCT ps;
@@ -165,12 +146,13 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
                 }
             }
             break;
-        case WM_MBUTTONDOWN:
+        case WM_MBUTTONDOWN: {
             if (hwnd && IsWindow(hwnd)) {
                 ToggleBroadcastWindow();
                 UpdateMythwareStatus();
             }
             break;
+        }
         case WM_RBUTTONDOWN: {
             POINT pt; GetCursorPos(&pt);
             HMENU hMenu = CreatePopupMenu();
@@ -208,7 +190,8 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
         }
         case WM_DESTROY:
             KillTimer(hWnd, 1);
-            if (g_hBitmap) { DeleteObject(g_hBitmap); g_hBitmap = NULL; }
+            delete g_pBitmap; g_pBitmap = NULL;
+            if (g_gdiToken) { Gdiplus::GdiplusShutdown(g_gdiToken); g_gdiToken = 0; }
             PostQuitMessage(0);
             break;
     }
