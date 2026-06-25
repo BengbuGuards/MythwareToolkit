@@ -8,7 +8,7 @@ echo ========================================
 echo.
 echo This will remove:
 echo   1. C:\Program Files\MythwareToolkit
-echo   2. Desktop shortcut
+echo   2. Desktop shortcuts
 echo   3. Trusted root certificates
 echo   4. Code signing certificates
 echo   5. Temp files (logs, extracted tools)
@@ -24,19 +24,19 @@ if %ERRORLEVEL% NEQ 0 (
 echo [1/5] Removing program directory...
 if exist "C:\Program Files\MythwareToolkit" (
     rmdir /s /q "C:\Program Files\MythwareToolkit"
-    echo   Removed C:\Program Files\MythwareToolkit
+    echo   Removed
 ) else (
     echo   Not found, skip
 )
 
-echo [2/5] Removing desktop shortcut...
+echo [2/5] Removing desktop shortcuts...
 if exist "%USERPROFILE%\Desktop\MythwareToolkit.lnk" (
     del /f /q "%USERPROFILE%\Desktop\MythwareToolkit.lnk"
-    echo   Removed user desktop shortcut
+    echo   Removed user shortcut
 )
 if exist "%PUBLIC%\Desktop\MythwareToolkit.lnk" (
     del /f /q "%PUBLIC%\Desktop\MythwareToolkit.lnk"
-    echo   Removed public desktop shortcut
+    echo   Removed public shortcut
 )
 
 echo [3/5] Removing trusted root certificates...

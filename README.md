@@ -2,7 +2,7 @@
 
 > 基于 [BengbuGuards/MythwareToolkit](https://github.com/BengbuGuards/MythwareToolkit) 源码进行 AI+人工修改，在此感谢原作者！
 
-> **[更新日志](CHANGELOG.md)** — 查看 v2.1.1 所有改动
+> **[更新日志](CHANGELOG.md)** | **[开发者文档](DEV.md)**
 
 极域工具包，支持多种控制极域以及学生机房管理助手的工具。StudentMain、Mythware、Jiyu
 
@@ -18,7 +18,6 @@
 
 - [功能](#功能)
 - [使用教程](#使用教程)
-- [开发者：编译与部署](#开发者编译与部署)
 - [故障排查](#故障排查)
 - [附录](#附录)
 
@@ -29,12 +28,14 @@ MythwareToolkit/
 ├── src/          ← 源码（9个 .cpp）
 ├── include/      ← 头文件（4个 .h）
 ├── res/          ← 资源（图标/图片/manifest/嵌入式exe）
-├── scripts/      ← 编译 + 签名 + 清理 + 图标转换
-├── cert/         ← 证书 + 部署（deploy.bat / mythware.cer / RootCA.reg / 故障排查）
-├── bin/          ← 编译输出（不入仓）
+├── scripts/      ← 编译 + 打包 + 签名 + 清理 + 图标转换
+├── cert/         ← 证书 + 部署（deploy.bat / mythware.cer / 故障排查）
+├── bin/          ← 编译产物 + 打包输出
+│   └── pkg/      ← 发行版文件（EXE + ZIP）
 ├── Makefile
 ├── README.md
-└── CHANGELOG.md
+├── CHANGELOG.md
+└── RELEASE.md
 ```
 
 ---
@@ -126,80 +127,6 @@ MythwareToolkit/
 | 位置 | 放哪都行 | 任意位置 |
 | 推荐场景 | 日常使用 | 教师端特别严格的环境 |
 
----
-
-## 开发者：编译与部署
-
-### UIAccess 完整版（超级置顶）
-
-两步走，全部双击运行：
-
-```batch
-scripts\build.bat    →  编译 + 自动签名（自动提权）
-cert\deploy.bat      →  部署到 C:\Program Files\
-```
-
-| 脚本 | 做什么 | 输出 |
-|------|--------|------|
-| `scripts\build.bat` | 编译 9 个源文件 → 自动签名 EXE | `bin\MythwareToolkit.exe`（已签名） |
-| `cert\deploy.bat` | 复制到 Program Files + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
-| `scripts\cleanup.bat` | 右键管理员运行 → 清除证书/程序/快捷方式 | 一键卸载 |
-| `convert_icon.bat` | PNG→ICO 多分辨率高清转换 | `res\float.ico` |
-
-> `build.bat` 编译完成后会自动提权签名，一步到位。如需单独重新签名可运行 `scripts\sign.ps1`。
-> 卸载时运行 `scripts\cleanup.bat`（管理员权限），一键清除证书和程序残留。
-
-### 便携版（免签名免安装）
-
-一步搞定：
-
-```batch
-scripts\build_portable.bat
-```
-
-输出 `bin\MythwareToolkit_Portable.exe`，U 盘即插即用，双击即可运行。
-
-> 便携版牺牲超级置顶能力（不能覆盖任务管理器），但无需签名和安装。
-
-### 两个版本的区别
-
-| | UIAccess 版 | 便携版 |
-|------|------------|--------|
-| 构建 | `build.bat`（编译+签名一步完成） | `build_portable.bat` |
-| uiAccess | `true`（超级置顶） | `false`（普通置顶） |
-| 签名 | build.bat 自动签名 | 不需要 |
-| 使用位置 | `C:\Program Files\`（deploy.bat 自动复制） | 任意位置 |
-| 弹窗处理 | `cert\deploy.bat` 装证书 | 不会弹窗 |
-| 悬浮窗 | 纯 GDI 圆形裁剪 | 同左 |
-
-### 依赖
-
-- [MinGW64](https://github.com/niXman/mingw-builds-binaries)（x86_64-XX.X.X-release-win32-seh-ucrt）
-- Windows 10 或更高版本（64 位）
-
-Makefile 也支持：`make` / `make portable`。
-
----
-
-## 故障排查
-
-### "从服务器返回了一个参照" 弹窗
-
-UIAccess 程序必须**同时满足**两个条件：EXE 已签名 **且** 证书受信任。只装证书不签名无效！
-
-**正确做法：** 运行 `scripts\build.bat`（编译后自动签名），或单独运行 `scripts\sign.bat` / `scripts\sign.ps1` 手动签名。
-
-如果已签名但证书问题：
-```batch
-certutil -addstore -f -enterprise Root cert\mythware.cer   :: 手动装证书
-cert\RootCA.reg                                              :: 或导入注册表
-```
-
-详见 `cert\从服务器返回一个参数解决方法.txt`。
-
-### 崩溃 / 0xC0000005
-
-v2.1 已修复学生机崩溃问题（移除对极域注入 DLL 的暴力卸载）。如仍遇崩溃，查看 `%TEMP%\MythwareToolkit_crash.log`（寄存器 + 栈回溯）和 `%TEMP%\MythwareToolkit_run.log`（运行日志）。
 
 ---
 

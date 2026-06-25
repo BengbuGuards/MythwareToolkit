@@ -26,7 +26,7 @@ echo MinGW: %MINGW%
 if not exist %OUTDIR% mkdir %OUTDIR%
 
 echo.
-echo === UIAccess Build (needs signing) ===
+echo === UIAccess Build (compile + sign) ===
 echo [ 1/11] resource.res & %WR% -i res\resource.rc --input-format=rc -o %OUTDIR%\resource.res -O coff || goto :err
 echo [ 2/11] utils.o      & %CXX% -c src\utils.cpp     -o %OUTDIR%\utils.o     %CFLAGS% || goto :err
 echo [ 3/11] process.o    & %CXX% -c src\process.cpp   -o %OUTDIR%\process.o   %CFLAGS% || goto :err
@@ -44,38 +44,37 @@ set "EXEFILE=%CD%\%OUTDIR%\MythwareToolkit.exe"
 for %%f in ("%EXEFILE%") do set FILESIZE=%%~zf
 echo.
 echo ========================================
-echo   Build Successful!
+echo   Build SUCCESS!
 echo ========================================
 echo   File : %EXEFILE%
 echo   Size : %FILESIZE% bytes
 echo.
 
-:: ── 自动签名 ──────────────────────────────────────
+:: Auto-sign
 set "PS=pwsh"
 where pwsh >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (set "PS=powershell")
 
 net session >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    :: 没有管理员权限 → 提权运行签名
     echo   [*] Elevating for code signing...
     %PS% -Command "Start-Process '%PS%' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1' -Verb RunAs -Wait -WorkingDirectory '%CD%'" 2>nul
 ) else (
-    :: 已有管理员权限 → 直接签名
     echo   [*] Signing EXE...
     %PS% -NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1
 )
 
 echo.
 echo ========================================
+echo   Build + Sign SUCCESS!
+echo ========================================
 echo   File : %EXEFILE%
 echo   Size : %FILESIZE% bytes
+echo   Next : cert\deploy.bat
 echo ========================================
-echo   Next: cert\deploy.bat
-echo ========================================
-goto :end
+pause
+goto :eof
 
 :err
 echo Build FAILED!
 pause
-:end

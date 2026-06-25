@@ -64,6 +64,15 @@ const char* GetRunLevelString() {
 
 void UpdateMythwareStatus() {
     DWORD id = GetProcessIDFromName(MythwareFilename);
+    LOG_INFO("UpdateMythwareStatus: MythwareFilename=%s pid=%lu", MythwareFilename, id);
+    if (id == 0) {
+        // 尝试其他可能的极域进程名
+        static const char* altNames[] = {"StudentM.exe", "StudentMain64.exe", "Student.exe", "MasterHelper.exe", NULL};
+        for (int i = 0; altNames[i] && id == 0; i++) {
+            id = GetProcessIDFromName(altNames[i]);
+            if (id) LOG_INFO("Found alternative: %s pid=%lu", altNames[i], id);
+        }
+    }
     if (id == 0) {
         SendMessage(TxOut, SB_SETTEXT, 1, LPARAM("极域未运行"));
         mwSts = 2;
@@ -103,6 +112,8 @@ void UpdateMythwareStatus() {
 }
 
 void ToggleBroadcastWindow() {
+    LOG_INFO("ToggleBroadcastWindow: hBdCst=%p", hBdCst);
+    if (!hBdCst) { SetWindowText(TxOut, "未找到广播窗口"); return; }
     LONG lStyle = GetWindowLong(hBdCst, GWL_STYLE);
     BOOL bWindowing = lStyle & (WS_CAPTION | WS_SIZEBOX);
     PostMessage(hBdCst, WM_COMMAND, MAKEWPARAM(1004, BM_CLICK), 0);
@@ -110,8 +121,11 @@ void ToggleBroadcastWindow() {
 }
 
 void ControlMythware(BOOL kill) {
+    LOG_INFO("ControlMythware kill=%d mwSts=%d MythwareFilename=%s", kill, mwSts, MythwareFilename);
     if (mwSts != 2) {
-        if (KillProcess(GetProcessIDFromName(MythwareFilename), KILL_FORCE)) {
+        DWORD pid = GetProcessIDFromName(MythwareFilename);
+        LOG_INFO("ControlMythware: pid=%lu", pid);
+        if (pid && KillProcess(pid, KILL_FORCE)) {
             SetWindowText(TxOut, "执行成功");
             Sleep(30);
         } else { ge; SetWindowText(TxOut, "执行失败"); }

@@ -3,22 +3,29 @@
 ## v2.1.1 — 2026-06-25
 
 ### 新功能
-- **退出黑屏安静**：主界面 + 悬浮窗右键均可触发。4 级递进（隐藏黑窗 → 取消置顶最小化 → 模拟 ESC → 确认后杀进程），前 3 级无感，教师端不会发现，可能会出现问题，超级置顶版问题可能比较小点，不建议使用
-- **UAC 提权**：MeltdownDFC/crdisk 和解除网络限制点击时自动弹 UAC 提权窗口，无需手动以管理员运行
+- **退出黑屏安静**：主界面 + 悬浮窗右键均可触发。4 级递进（隐藏黑窗 → 取消置顶最小化 → 模拟 ESC → 确认后杀进程），前 3 级无感，教师端不会发现
+- **UAC 提权**：MeltdownDFC/crdisk 和解除网络限制点击时自动弹 UAC 提权窗口
+- **极域进程名多样识别**：依次尝试 `StudentMain.exe` / `StudentM.exe` / `StudentMain64.exe` / `Student.exe` / `MasterHelper.exe`，适配不同版本
 
 ### 置顶机制重构
-- **UIAccess 版移除 ThreadProc**：UIAccess 自带真正置顶，不再需要轮询线程抢 Z 序
-- **便携版事件驱动**：新增 `WM_WINDOWPOSCHANGED` 处理，只在被挤下去时才重新置顶，大幅减少与极域黑屏窗口的冲突
-- **悬浮窗右键菜单**：不再呼出主界面，避免窗口抢 Z 序导致菜单闪退
+- **UIAccess 版移除 ThreadProc**：UIAccess 自带真正置顶，不再轮询线程抢 Z 序（编译宏 `-DUIACCESS_BUILD`）
+- **便携版事件驱动**：新增 `WM_WINDOWPOSCHANGED` 处理，只在被挤下去时才重新置顶
+- **悬浮窗右键菜单**：不再呼出主界面，消除 Z 序闪烁
 
 ### Bug 修复
 - **修复 ThreadProc Z 序闪烁**：窗口隐藏时跳过置顶、降低轮询频率
+- **修复找不到极域进程**：`UpdateMythwareStatus` 和 `ControlMythware` 增加多项进程名匹配 + 详细日志
+
+### 构建 / 脚本
+- **`scripts/package.bat`**：一键编译+签名+打包 ZIP，输出 `bin/pkg/MythwareToolkit.zip`
+- **`scripts/cleanup.bat`**：一键清理证书、程序目录、桌面快捷方式、临时文件（纯 ASCII）
+- **bin 目录结构调整**：`.o`/`.res`/`.exe` → `bin/`，打包输出 → `bin/pkg/`
+- 便携版 `build_portable.bat` 编译后自动复制 EXE 到 `bin/pkg/`
 
 ### 工具 / 文档
-- **`scripts/cleanup.bat`**：一键清理证书、程序目录、桌面快捷方式、临时文件
 - **README 目录**：添加章节索引，快速跳转
-- **简化故障排查说明**：面向最终用户，一句话解决方案
-- 版本号更新为 2.1.1
+- **RELEASE.md**：发行版说明，面向最终用户
+- **简化故障排查说明**：一句话解决方案
 
 ---
 
