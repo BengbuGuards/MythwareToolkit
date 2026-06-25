@@ -30,8 +30,9 @@
 ```
 MythwareToolkit_UIAccess.zip
 ├── MythwareToolkit.exe   ← 主程序（已签名）
-├── deploy.bat            ← 证书安装脚本
-└── mythware.cer          ← 签名证书
+├── deploy.bat            ← 一键部署脚本（管理员运行）
+├── mythware.cer          ← 签名证书
+└── RootCA.reg            ← 原版证书（注册表兜底）
 ```
 
 ### 使用说明
