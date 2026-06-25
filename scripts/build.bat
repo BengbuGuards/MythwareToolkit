@@ -48,11 +48,30 @@ echo   Build Successful!
 echo ========================================
 echo   File : %EXEFILE%
 echo   Size : %FILESIZE% bytes
-echo   Type : UIAccess ^(needs signing^)
 echo.
-echo   Next steps:
-echo     1. Sign  : powershell -File scripts\sign.ps1
-echo     2. Deploy: cert\deploy.bat
+
+:: ── 自动签名 ──────────────────────────────────────
+set "PS=pwsh"
+where pwsh >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (set "PS=powershell")
+
+net session >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    :: 没有管理员权限 → 提权运行签名
+    echo   [*] Elevating for code signing...
+    %PS% -Command "Start-Process '%PS%' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1' -Verb RunAs -Wait -WorkingDirectory '%CD%'" 2>nul
+) else (
+    :: 已有管理员权限 → 直接签名
+    echo   [*] Signing EXE...
+    %PS% -NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1
+)
+
+echo.
+echo ========================================
+echo   File : %EXEFILE%
+echo   Size : %FILESIZE% bytes
+echo ========================================
+echo   Next: cert\deploy.bat
 echo ========================================
 goto :end
 

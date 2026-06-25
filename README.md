@@ -76,19 +76,19 @@ MythwareToolkit/
 
 ### UIAccess 完整版（超级置顶）
 
-三步走，全部双击运行：
+两步走，全部双击运行：
 
 ```batch
-scripts\build.bat    →  编译（自动检测 MinGW64）
-scripts\sign.bat     →  签名 + 安装证书（自动提权）
+scripts\build.bat    →  编译 + 自动签名（自动提权）
 cert\deploy.bat      →  部署到 C:\Program Files\
 ```
 
 | 脚本 | 做什么 | 输出 |
 |------|--------|------|
-| `scripts\build.bat` | 编译 9 个源文件 + 资源 | `bin\MythwareToolkit.exe` |
-| `scripts\sign.bat` | 生成证书 → 安装到受信任根 → 签名 EXE | `cert\mythware.cer` + 已签名 EXE |
-| `cert\deploy.bat` | 复制到 Program Files + 装证书 + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
+| `scripts\build.bat` | 编译 9 个源文件 → 自动签名 EXE | `bin\MythwareToolkit.exe`（已签名） |
+| `cert\deploy.bat` | 复制到 Program Files + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
+
+> `build.bat` 编译完成后会自动提权签名，一步到位。如需单独重新签名可运行 `scripts\sign.ps1`。
 
 ### 便携版（免签名免安装）
 
@@ -127,7 +127,7 @@ Makefile 也支持：`make` / `make portable`。
 
 UIAccess 程序必须**同时满足**两个条件：EXE 已签名 **且** 证书受信任。只装证书不签名无效！
 
-**正确做法：** 运行 `scripts\sign.bat`（一步完成签名+装证书），而不是只导入 `cert\mythware.cer`。
+**正确做法：** 运行 `scripts\build.bat`（编译后自动签名），或单独运行 `scripts\sign.bat` / `scripts\sign.ps1` 手动签名。
 
 如果已签名但证书问题：
 ```batch
