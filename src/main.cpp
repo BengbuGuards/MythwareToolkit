@@ -73,18 +73,26 @@ static void RunEmbeddedExe(int resId, LPCSTR exeName) {
         }
         LOG_INFO("Extracted %lu bytes to %s", dwSize, szTempPath);
         FlushFileBuffers(hFile); CloseHandle(hFile);
-        // 用 CreateProcess 替代废弃的 WinExec
-        STARTUPINFO si = {}; PROCESS_INFORMATION pi = {};
-        si.cb = sizeof(si);
-        if (CreateProcess(NULL, szTempPath, NULL, NULL, FALSE,
-                          CREATE_NEW_PROCESS_GROUP | NORMAL_PRIORITY_CLASS,
-                          NULL, NULL, &si, &pi)) {
-            LOG_INFO("Launched %s (pid=%lu)", exeName, pi.dwProcessId);
-            CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
+        // ShellExecuteEx + runas 提权（MeltdownDFC/crdisk 需要管理员权限）
+        SHELLEXECUTEINFO sei = {};
+        sei.cbSize = sizeof(sei);
+        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+        sei.lpVerb = "runas";
+        sei.lpFile = szTempPath;
+        sei.nShow = SW_SHOW;
+        if (ShellExecuteEx(&sei)) {
+            LOG_INFO("Launched %s (pid=%lu)", exeName, GetProcessId(sei.hProcess));
+            CloseHandle(sei.hProcess);
             SetWindowText(TxOut, "执行完成");
         } else {
-            LOG_ERROR("CreateProcess(%s) failed: err=%lu", szTempPath, GetLastError());
-            SetWindowText(TxOut, "启动失败");
+            DWORD err = GetLastError();
+            if (err == ERROR_CANCELLED) {
+                LOG_INFO("User cancelled UAC prompt for %s", exeName);
+                SetWindowText(TxOut, "用户取消");
+            } else {
+                LOG_ERROR("ShellExecuteEx(%s) failed: err=%lu", exeName, err);
+                SetWindowText(TxOut, "启动失败");
+            }
         }
     } else {
         LOG_ERROR("LockResource failed or size=0");
@@ -191,7 +199,32 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                 case 1002: MessageBox(NULL, helpText, "关于/帮助", MB_OK | MB_ICONINFORMATION); break;
                 case 1004: ControlMythware(FALSE); UpdateMythwareStatus(); break;
                 case 1007: UnlockSystemPrograms(hwnd); break;
-                case 1008: RemoveNetworkRestrictions(); break;
+                case 1008: {
+    // 提权后重新运行本程序执行解除网络限制
+    char exePath[MAX_PATH];
+    GetModuleFileName(NULL, exePath, MAX_PATH);
+    SHELLEXECUTEINFO sei = {};
+    sei.cbSize = sizeof(sei);
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpVerb = "runas";
+    sei.lpFile = exePath;
+    sei.lpParameters = "-net";
+    sei.nShow = SW_HIDE;
+    if (ShellExecuteEx(&sei)) {
+        LOG_INFO("Elevated RemoveNetworkRestrictions launched (pid=%lu)", GetProcessId(sei.hProcess));
+        CloseHandle(sei.hProcess);
+        SetWindowText(TxOut, "正在解除网络限制...");
+    } else {
+        DWORD err = GetLastError();
+        if (err == ERROR_CANCELLED)
+            SetWindowText(TxOut, "用户取消");
+        else {
+            LOG_ERROR("ShellExecuteEx runas failed: err=%lu", err);
+            RemoveNetworkRestrictions();  // 回退：直接尝试
+        }
+    }
+    break;
+}
                 case 1009: RemoveUSBRestrictions(hwnd); break;
                 case 1010: {
                     HWND hShell = FindWindow("Shell_TrayWnd", NULL); DWORD pid;
@@ -347,9 +380,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         else eLevel = RL_USER;
     } else eLevel = RL_UNKNOWN;
 
-    int argc; bool bStartAsSystem = false;
+    int argc; bool bStartAsSystem = false; bool bDoNetUnlock = false;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argv) { bStartAsSystem = (!_wcsicmp(argv[1], L"-s") || !_wcsicmp(argv[1], L"/s")); LocalFree(argv); }
+    if (argv) {
+        bStartAsSystem = (!_wcsicmp(argv[1], L"-s") || !_wcsicmp(argv[1], L"/s"));
+        bDoNetUnlock   = (!_wcsicmp(argv[1], L"-net") || !_wcsicmp(argv[1], L"/net"));
+        LocalFree(argv);
+    }
+    // -net 参数：提权后自动执行解除网络限制
+    if (bDoNetUnlock) {
+        LOG_INFO("Auto-run RemoveNetworkRestrictions (elevated)");
+        RemoveNetworkRestrictions();
+        return 0;
+    }
     if (eLevel != RL_SYSTEM && bStartAsSystem) {
         EnableDebugPrivilege();
         HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, GetProcessIDFromName("lsass.exe"));
