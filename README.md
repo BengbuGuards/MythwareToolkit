@@ -29,7 +29,7 @@ MythwareToolkit/
 ├── src/          ← 源码（9个 .cpp）
 ├── include/      ← 头文件（4个 .h）
 ├── res/          ← 资源（图标/图片/manifest/嵌入式exe）
-├── scripts/      ← 编译 + 签名（build.bat / build_portable.bat / sign.bat / sign.ps1）
+├── scripts/      ← 编译 + 签名 + 清理 + 图标转换
 ├── cert/         ← 证书 + 部署（deploy.bat / mythware.cer / RootCA.reg / 故障排查）
 ├── bin/          ← 编译输出（不入仓）
 ├── Makefile
@@ -143,8 +143,11 @@ cert\deploy.bat      →  部署到 C:\Program Files\
 |------|--------|------|
 | `scripts\build.bat` | 编译 9 个源文件 → 自动签名 EXE | `bin\MythwareToolkit.exe`（已签名） |
 | `cert\deploy.bat` | 复制到 Program Files + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
+| `scripts\cleanup.bat` | 右键管理员运行 → 清除证书/程序/快捷方式 | 一键卸载 |
+| `convert_icon.bat` | PNG→ICO 多分辨率高清转换 | `res\float.ico` |
 
 > `build.bat` 编译完成后会自动提权签名，一步到位。如需单独重新签名可运行 `scripts\sign.ps1`。
+> 卸载时运行 `scripts\cleanup.bat`（管理员权限），一键清除证书和程序残留。
 
 ### 便携版（免签名免安装）
 
