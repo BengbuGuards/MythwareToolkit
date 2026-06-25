@@ -36,13 +36,17 @@ MythwareToolkit_UIAccess.zip
 
 ### 使用说明
 
-**1.** 解压到任意位置（U 盘、桌面、D 盘都行）。
+**1.** 将压缩包解压到某个文件夹。
 
-**2.** 双击 `MythwareToolkit.exe`。
+**2.** 右键 `deploy.bat` → **以管理员身份运行**。这一步会：
 
-**3.** 如果弹出"从服务器返回了一个参照"：
+- 安装证书到系统受信任根 → 解决弹窗
+- 复制 `MythwareToolkit.exe` 到 `C:\Program Files\MythwareToolkit\`
+- 创建桌面快捷方式
 
-> 右键 `deploy.bat` → 以管理员身份运行。证书装一次，以后不再弹。
+**3.** 之后从桌面快捷方式启动，或直接打开 `C:\Program Files\MythwareToolkit\MythwareToolkit.exe`。
+
+> **为什么必须放 Program Files？** UIAccess 是 Windows 安全机制，只允许签名过的 exe 从系统受保护目录（`C:\Program Files\` / `C:\Windows\`）运行。放桌面或 D 盘会一直弹"从服务器返回了一个参照"，就算证书装好了也没用。
 
 ---
 
@@ -55,4 +59,4 @@ MythwareToolkit_UIAccess.zip
 不需要。证书装一次就行，之后直接双击 EXE。
 
 **Q：为什么弹"从服务器返回了一个参照"？**
-EXE 已签名，但你的电脑还没信任这个证书。运行 `deploy.bat` 即可。
+三个可能：1) 证书没装 → 运行 `deploy.bat`；2) EXE 没放在 `C:\Program Files\` 下 → 复制过去；3) 两个都没做 → 直接运行 `deploy.bat` 一步搞定。

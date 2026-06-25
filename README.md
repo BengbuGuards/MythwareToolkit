@@ -88,16 +88,15 @@ MythwareToolkit/
 
 > 下载的文件包应包含：`MythwareToolkit.exe` + `deploy.bat` + `mythware.cer`
 
-**1. 首先**，双击 `MythwareToolkit.exe` 尝试运行。
+**1. 首先**，右键 `deploy.bat` → **以管理员身份运行**。它会自动：
 
-**2. 如果弹出"从服务器返回了一个参照"：**
-
-说明证书还没装到这台电脑上，双击 `deploy.bat`（以管理员身份），它会自动：
-
-- 安装证书到受信任根 → 从此不再弹窗
+- 安装证书到系统受信任根
+- 复制 `MythwareToolkit.exe` 到 `C:\Program Files\MythwareToolkit\`
 - 创建桌面快捷方式
 
-之后就可以正常运行了。
+**2. 之后**从桌面快捷方式启动即可。
+
+> **为什么必须用 deploy.bat？** UIAccess 是 Windows 安全机制：exe 必须已签名、证书必须受信任、**且 exe 必须在 `C:\Program Files\` 下**。放桌面或别处会一直弹窗，即使装了证书也没用。`deploy.bat` 一步搞定这三个条件。
 
 > 证书只需装一次，同一台电脑以后不用再装。
 
@@ -151,7 +150,7 @@ scripts\build_portable.bat
 | 构建 | `build.bat`（编译+签名一步完成） | `build_portable.bat` |
 | uiAccess | `true`（超级置顶） | `false`（普通置顶） |
 | 签名 | build.bat 自动签名 | 不需要 |
-| 使用位置 | 任意位置 | 任意位置 |
+| 使用位置 | `C:\Program Files\`（deploy.bat 自动复制） | 任意位置 |
 | 弹窗处理 | `cert\deploy.bat` 装证书 | 不会弹窗 |
 | 悬浮窗 | GDI+ 圆形裁剪 + 抗锯齿 | 同左 |
 
