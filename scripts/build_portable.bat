@@ -56,9 +56,19 @@ copy /Y res\sys_original.manifest res\sys.manifest >nul 2>nul
 :: 如��上面失败，恢复 uiAccess=true 的版本
 if not exist res\sys.manifest copy /Y res\sys_original.manifest res\sys.manifest >nul 2>nul
 
+set "EXEFILE=%CD%\%OUTDIR%\MythwareToolkit_Portable.exe"
+for %%f in ("%EXEFILE%") do set FILESIZE=%%~zf
 echo.
-echo Build OK: %OUTDIR%\MythwareToolkit_Portable.exe
-echo This version works on ANY PC without signing or certificate!
+echo ========================================
+echo   Build Successful!
+echo ========================================
+echo   File : %EXEFILE%
+echo   Size : %FILESIZE% bytes
+echo   Type : Portable ^(no signing, no install^)
+echo.
+echo   Ready to use:
+echo     %EXEFILE%
+echo ========================================
 goto :end
 
 :err

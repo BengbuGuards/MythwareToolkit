@@ -40,7 +40,20 @@ echo [10/11] main.o       & %CXX% -c src\main.cpp      -o %OUTDIR%\main.o      %
 echo [11/11] Linking...
 %CXX% %OUTDIR%\main.o %OUTDIR%\utils.o %OUTDIR%\process.o %OUTDIR%\bypass.o %OUTDIR%\assistant.o %OUTDIR%\mythware.o %OUTDIR%\hooks.o %OUTDIR%\psd.o %OUTDIR%\floating.o %OUTDIR%\resource.res -o %OUTDIR%\MythwareToolkit.exe %LFLAGS% || goto :err
 
-echo Build OK: %OUTDIR%\MythwareToolkit.exe
+set "EXEFILE=%CD%\%OUTDIR%\MythwareToolkit.exe"
+for %%f in ("%EXEFILE%") do set FILESIZE=%%~zf
+echo.
+echo ========================================
+echo   Build Successful!
+echo ========================================
+echo   File : %EXEFILE%
+echo   Size : %FILESIZE% bytes
+echo   Type : UIAccess ^(needs signing^)
+echo.
+echo   Next steps:
+echo     1. Sign  : powershell -File scripts\sign.ps1
+echo     2. Deploy: cert\deploy.bat
+echo ========================================
 goto :end
 
 :err
