@@ -1,5 +1,37 @@
 # 更新日志
 
+## v2.1.0 — 2026-06-25
+
+### 关键 Bug 修复
+
+- **修复学生机崩溃（0xC0000005）**：移除对极域注入 DLL（`LibTDProcHook`/`LibTDMaster`）的暴力卸载。`FreeModule` 后系统钩子仍指向已释放内存，悬浮窗收到窗口消息时触发 DEP 崩溃。保留 DLL 加载，通过自带钩子覆盖其行为
+- **修复悬浮窗图标问题**：移除 GDI+ 依赖，改用纯 GDI `LoadImage(ICON)` + `DrawIconEx`。修复 `.ico` 文件格式（BMP DIB, wPlanes=1, 多分辨率 16~128px），兼容 `windres` 编译
+- **修复 GDI 资源泄漏**：WM_PAINT 中 `SelectObject` 返回值全部保存/恢复，消除 Bitmap/Pen 对象泄漏
+- **修复便携版弹"从服务器返回一个参照"**：便携版 manifest 编译时正确嵌入 `uiAccess=false`
+- **修复解除网络限制无效**：`RemoveNetworkRestrictions` 中 `CreateFile` 判断改用 `INVALID_HANDLE_VALUE` 而非 `GetLastError`
+- **修复 MeltdownDFC/crdisk 无法启动**：`RunEmbeddedExe` 改用 `CreateProcess`（替换废弃的 `WinExec`），修复 `WriteFile` 多写 1 字节溢出
+
+### 新功能 / 增强
+
+- **运行时日志系统**：所有关键操作写入 `%TEMP%\MythwareToolkit_run.log`（追加模式），含时间戳、级别（INFO/WARN/ERROR/CRASH）、函数名。`LOG_INFO/LOG_WARN/LOG_ERROR` 宏全局可用
+- **崩溃日志增强**：完整寄存器转储（RIP/RSP/RBP/RAX/RBX/RCX/RDX/RSI/RDI/R8/R9）+ RBP 链栈回溯 + 模块定位 + 访问类型（READ/WRITE/EXECUTE）
+- **弹出菜单防截屏**：悬浮窗右键、托盘右键、下拉菜单均通过 `SetWindowDisplayAffinity` 对教师端监控不可见
+
+### 构建 / 工具
+
+- **`convert_icon.ps1` + `convert_icon.bat`**：高质量 PNG→ICO 转换，多分辨率输出（16/24/32/48/64/128px），HighQualityBicubic 缩放，BMP DIB 格式
+- **Makefile 清理**：移除便携版未使用的 `-lgdiplus`
+- **资源管理**：`FLOATICO` 和 `MAINICON` 独立指向，方便后续替换悬浮窗图标
+
+### 代码质量
+
+- `CreateFloatingWindow` 失败时弹诊断框（仅失败时）
+- 悬浮窗 `WM_CREATE` 增加 `IDI_APPLICATION` 兜底
+- 图标绘制前通过 `GetIconInfo` 验证有效性
+- `TrackPopupMenuProtected` 封装防截屏逻辑，统一调用
+
+---
+
 ## v2.0.0 — 2026-06-24
 
 ### 代码重构（开发质量）
@@ -12,7 +44,7 @@
   - `assistant.cpp` — 学生机房管理助手全版本（v7.2 ~ v12.98）检测与杀进程
   - `mythware.cpp` — 极域密码读取、广播窗口检测、极域进程控制
   - `hooks.cpp` — 键盘钩子、鼠标钩子、窗口置顶线程
-  - `floating.cpp` — 圆形悬浮窗（嵌入图片 + GDI+ 抗锯齿渲染）
+  - `floating.cpp` — 圆形悬浮窗（嵌入图片 ）
   - `psd.cpp` — 动态密码计算器对话框
 - **公共头文件**：新增 `globals.h`，集中管理宏定义、全局变量声明、函数原型
 - **编码统一**：所有源文件从 GBK 转为 UTF-8，IDE 中不再出现乱码

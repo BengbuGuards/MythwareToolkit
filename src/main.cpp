@@ -27,7 +27,7 @@ VBRandomEngine  VBMath;
 NTSTATUS (NTAPI *NtSuspendProcess)(IN HANDLE Process);
 NTSTATUS (NTAPI *NtResumeProcess)(IN HANDLE Process);
 
-static LPCSTR helpText = "极域工具包 v2.0 | 小流汗黄豆 | 交流群828869154（进群请注明极域工具包）\n\
+static LPCSTR helpText = "极域工具包 v2.1 | 小流汗黄豆 | 交流群828869154（进群请注明极域工具包）\n\
 额外功能：1. 快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
 2. 悬浮窗左键打开主面板，右键直接切换广播窗口化/全屏化，可拖拽移动\n\
 3. 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
@@ -46,21 +46,50 @@ static bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
 }
 
 static void RunEmbeddedExe(int resId, LPCSTR exeName) {
+    LOG_INFO("RunEmbeddedExe resId=%d name=%s", resId, exeName);
     DWORD dwPID = GetProcessIDFromName(exeName);
-    if (dwPID) return;
+    if (dwPID) { LOG_INFO("%s already running (pid=%lu)", exeName, dwPID); return; }
     char szTempPath[MAX_PATH]; GetTempPath(MAX_PATH, szTempPath);
-    HANDLE hFile = CreateFile(strcat(szTempPath, exeName), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) { SetWindowText(TxOut, "创建失败"); return; }
+    strcat(szTempPath, exeName);
+    HANDLE hFile = CreateFile(szTempPath, GENERIC_ALL, FILE_SHARE_READ, NULL,
+                               CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        LOG_ERROR("CreateFile(%s) failed: err=%lu", szTempPath, GetLastError());
+        SetWindowText(TxOut, "创建失败"); return;
+    }
     HRSRC hResInfo = FindResource(NULL, MAKEINTRESOURCE(resId), RT_RCDATA);
+    if (!hResInfo) {
+        LOG_ERROR("FindResource(%d) failed: err=%lu", resId, GetLastError());
+        CloseHandle(hFile); SetWindowText(TxOut, "资源未找到"); return;
+    }
     HGLOBAL hResData = LoadResource(NULL, hResInfo);
     DWORD dwSize = SizeofResource(NULL, hResInfo);
     LPVOID pData = LockResource(hResData);
-    if (pData) {
-        if (!WriteFile(hFile, pData, dwSize + 1, NULL, NULL)) { SetWindowText(TxOut, "写入失败"); CloseHandle(hFile); return; }
+    if (pData && dwSize > 0) {
+        DWORD written;
+        if (!WriteFile(hFile, pData, dwSize, &written, NULL)) {
+            LOG_ERROR("WriteFile failed: err=%lu", GetLastError());
+            SetWindowText(TxOut, "写入失败"); CloseHandle(hFile); return;
+        }
+        LOG_INFO("Extracted %lu bytes to %s", dwSize, szTempPath);
         FlushFileBuffers(hFile); CloseHandle(hFile);
-        if (WinExec(szTempPath, SW_SHOW) < 32) SetWindowText(TxOut, "启动失败");
-        else SetWindowText(TxOut, "执行完成");
-    } else { SetWindowText(TxOut, "写入失败"); CloseHandle(hFile); }
+        // 用 CreateProcess 替代废弃的 WinExec
+        STARTUPINFO si = {}; PROCESS_INFORMATION pi = {};
+        si.cb = sizeof(si);
+        if (CreateProcess(NULL, szTempPath, NULL, NULL, FALSE,
+                          CREATE_NEW_PROCESS_GROUP | NORMAL_PRIORITY_CLASS,
+                          NULL, NULL, &si, &pi)) {
+            LOG_INFO("Launched %s (pid=%lu)", exeName, pi.dwProcessId);
+            CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
+            SetWindowText(TxOut, "执行完成");
+        } else {
+            LOG_ERROR("CreateProcess(%s) failed: err=%lu", szTempPath, GetLastError());
+            SetWindowText(TxOut, "启动失败");
+        }
+    } else {
+        LOG_ERROR("LockResource failed or size=0");
+        SetWindowText(TxOut, "写入失败"); CloseHandle(hFile);
+    }
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
@@ -71,7 +100,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             char szVersion[BUFSIZ] = {};
             sprintf(szVersion, "系统版本：%u.%u.%u %d-bit\n程序版本：%s %d-bit\n",
                 vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber,
-                (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, "2.0.0", sizeof(PVOID)*8);
+                (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, "2.1.0", sizeof(PVOID)*8);
             sOutPut += szVersion;
             EnableDebugPrivilege();
             w = GetSystemMetrics(SM_CXSCREEN) - 1; h = GetSystemMetrics(SM_CYSCREEN) - 1;
@@ -149,14 +178,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             focus = GetDlgItem(hwnd, 1013); SetFocus(focus);
             SendMessage(hwnd, WM_TIMER, WPARAM(2), 0);
 
-            HMODULE hook = NULL;
-            if (sizeof(PVOID) == 8) {
-                hook = GetModuleHandle("LibTDProcHook64.dll"); if (hook) FreeModule(hook);
-                hook = GetModuleHandle("LibTDMaster64.dll"); if (hook) FreeModule(hook);
-            } else {
-                hook = GetModuleHandle("LibTDProcHook32.dll"); if (hook) FreeModule(hook);
-                hook = GetModuleHandle("LibTDMaster32.dll"); if (hook) FreeModule(hook);
-            }
+            // 极域注入的 hook DLL 不能直接 FreeModule，因为系统钩子还指着 DLL 内地址
+            // 暴力卸载会导致钩子回调跳转到无效内存 → 0xC0000005 DEP 崩溃
+            // 正确做法：保留 DLL 加载，通过我们自己的钩子覆盖其行为即可
             break;
         }
 
@@ -256,7 +280,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 
         case WM_USER + 3:
             if (lParam == WM_LBUTTONDBLCLK) { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); }
-            else if (lParam == WM_RBUTTONUP) { GetCursorPos(&pt); SetForegroundWindow(hwnd); HMENU hPopup = CreatePopupMenu(); AppendMenu(hPopup, MF_STRING, 1, "关闭程序"); AppendMenu(hPopup, MF_STRING, 2, "打开窗口"); int i = TrackPopupMenu(hPopup, TPM_RETURNCMD, pt.x, pt.y, 0, hwnd, NULL); if (i == 1) { DestroyFloatingWindow(); PostQuitMessage(0); } else if (i == 2) { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); } }
+            else if (lParam == WM_RBUTTONUP) { GetCursorPos(&pt); SetForegroundWindow(hwnd); HMENU hPopup = CreatePopupMenu(); AppendMenu(hPopup, MF_STRING, 1, "关闭程序"); AppendMenu(hPopup, MF_STRING, 2, "打开窗口"); int i = TrackPopupMenuProtected(hPopup, TPM_RETURNCMD, pt.x, pt.y, hwnd); if (i == 1) { DestroyFloatingWindow(); PostQuitMessage(0); } else if (i == 2) { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); } }
             return FALSE;
 
         case WM_NOTIFY:
@@ -270,7 +294,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                         AppendMenu(hSplitMenu, MF_BYPOSITION, 1, (mwSts != 1) ? "挂起极域" : "恢复极域");
                         EnableMenuItem(hSplitMenu, 1, mwSts != 2 ? MF_ENABLED : MF_GRAYED);
                         SuspendThread(thread);
-                        int i = TrackPopupMenu(hSplitMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, ptBtn.x, ptBtn.y, 0, hwnd, NULL);
+                        int i = TrackPopupMenuProtected(hSplitMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, ptBtn.x, ptBtn.y, hwnd);
                         ResumeThread(thread);
                         if (i == 1) { BOOL sts = SuspendProcess(GetProcessIDFromName(MythwareFilename), !mwSts); SetWindowText(TxOut, sts ? "挂起/恢复成功" : "挂起/恢复失败"); UpdateMythwareStatus(); }
                         return TRUE;
@@ -311,6 +335,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     SetUnhandledExceptionFilter(GlobalExceptionHandler);
     InitNTAPI();
+    LOG_INFO("WinMain start, cmdLine=%s", lpCmdLine ? lpCmdLine : "(null)");
 
     HANDLE hToken; OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken);
     DWORD dwLength = 0; GetTokenInformation(hToken, TokenIntegrityLevel, NULL, 0, &dwLength);
@@ -351,7 +376,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ShowWindow(hwnd, nCmdShow); UpdateWindow(hwnd);
     InitLogFile();
-    CreateFloatingWindow(hInstance);
+    LOG_INFO("Creating floating window...");
+    if (!CreateFloatingWindow(hInstance)) {
+        LOG_ERROR("CreateFloatingWindow returned NULL");
+        Println("悬浮窗创建失败（可能窗口类已注册或资源加载异常）");
+    }
+    LOG_INFO("Entering message loop");
 
     while (GetMessage(&msg, NULL, 0, 0) > 0) { if (!IsDialogMessage(hwnd, &msg)) { TranslateMessage(&msg); DispatchMessage(&msg); } }
     return msg.wParam;

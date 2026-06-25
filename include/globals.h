@@ -98,6 +98,12 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
 void        InitLogFile();
 void        CloseLogFile();
 void        LogWrite(const char* text);
+void        WriteRuntimeLog(const char* level, const char* where, const char* fmt, ...);
+
+// 运行时日志宏（写入 %TEMP%\MythwareToolkit_run.log）
+#define LOG_INFO(fmt, ...)  WriteRuntimeLog("INFO",  __FUNCTION__, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...)  WriteRuntimeLog("WARN",  __FUNCTION__, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) WriteRuntimeLog("ERROR", __FUNCTION__, fmt, ##__VA_ARGS__)
 
 // process
 void  InitNTAPI();
@@ -128,3 +134,6 @@ void RemoveUSBRestrictions(HWND hwnd);
 
 // assistant
 void KillStudentAssistant();
+
+// floating — 受保护的弹出菜单（对教师端监控不可见）
+BOOL TrackPopupMenuProtected(HMENU hMenu, UINT uFlags, int x, int y, HWND hWnd);

@@ -156,18 +156,42 @@ void UnlockSystemPrograms(HWND hwnd) {
 }
 
 void RemoveNetworkRestrictions() {
-    HANDLE hNetFilter = CreateFile("\\\\.\\TDNetFilter", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-    if (!GetLastError()) { DeviceIoControl(hNetFilter, 0x120014, NULL, 0, NULL, 0, NULL, 0); PrtError("解除网络限制：发送停止指令", GetLastError()); CloseHandle(hNetFilter); }
-    else PrtError("解除网络限制：打开设备", GetLastError());
+    LOG_INFO("RemoveNetworkRestrictions start");
+    // 步骤1：通过设备驱动解除网络限制
+    HANDLE hNetFilter = CreateFile("\\\\.\\TDNetFilter", GENERIC_READ | GENERIC_WRITE,
+                                    FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (hNetFilter != INVALID_HANDLE_VALUE) {
+        LOG_INFO("TDNetFilter device opened OK");
+        DeviceIoControl(hNetFilter, 0x120014, NULL, 0, NULL, 0, NULL, 0);
+        PrtError("解除网络限制：发送停止指令", GetLastError());
+        CloseHandle(hNetFilter);
+    } else {
+        LOG_WARN("TDNetFilter device open failed: err=%lu", GetLastError());
+        PrtError("解除网络限制：打开设备", GetLastError());
+    }
+    // 步骤2：杀掉相关进程
     bool bStateM = KillProcess(GetProcessIDFromName("MasterHelper.exe"), KILL_DEFAULT);
     bool bStateG = KillProcess(GetProcessIDFromName("GATESRV.exe"), KILL_DEFAULT);
+    LOG_INFO("Kill MasterHelper=%d GATESRV=%d", bStateM, bStateG);
     std::string text = "解除网络限制：停止相关进程";
     Println((text + (bStateM && bStateG ? "成功" : "失败")).c_str());
+    // 步骤3：停止并删除限网驱动服务
     SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
-    SC_HANDLE hFilt = OpenService(sc, "TDNetFilter", SERVICE_STOP | DELETE);
-    SERVICE_STATUS ss = {};
-    bStateM = ControlService(hFilt, SERVICE_CONTROL_STOP, &ss);
-    DeleteService(hFilt); CloseServiceHandle(sc); CloseServiceHandle(hFilt);
+    if (sc) {
+        SC_HANDLE hFilt = OpenService(sc, "TDNetFilter", SERVICE_STOP | DELETE);
+        if (hFilt) {
+            SERVICE_STATUS ss = {};
+            bStateM = ControlService(hFilt, SERVICE_CONTROL_STOP, &ss);
+            LOG_INFO("TDNetFilter service stop: %d", bStateM);
+            DeleteService(hFilt);
+            CloseServiceHandle(hFilt);
+        } else {
+            LOG_WARN("TDNetFilter service not found: err=%lu", GetLastError());
+        }
+        CloseServiceHandle(sc);
+    } else {
+        LOG_WARN("OpenSCManager failed: err=%lu", GetLastError());
+    }
     text = "解除网络限制：停止限网驱动";
     Println((text + (bStateM ? "成功" : "失败")).c_str());
     SetWindowText(TxOut, "设置完成");

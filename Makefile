@@ -9,7 +9,7 @@ RM       = del /q /f
 # Compiler / linker flags
 CXXFLAGS = -O3 -pipe -lntdll -fexec-charset=UTF-8 -Iinclude
 LFLAGS   = -s -mwindows -lcomctl32 -lole32 -loleaut32 -luuid -static
-LFLAGS_P = -s -mwindows -lcomctl32 -lgdi32 -lgdiplus -lole32 -static
+LFLAGS_P = -s -mwindows -lcomctl32 -lgdi32 -static
 
 # Source files
 SRCDIR   = src
