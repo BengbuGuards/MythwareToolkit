@@ -101,7 +101,8 @@ MythwareToolkit/
 ### 超级置顶版（可覆盖任务管理器）
 
 > 下载的文件包应包含：`MythwareToolkit.exe` + `deploy.bat` + `mythware.cer`
-> 如果双击 `MythwareToolkit.exe` 可直接打开，则不需要下列几个步骤
+> 如果双击 `MythwareToolkit.exe` 可直接打开
+> 则不需要下列几个步骤
 
 **1. 首先**，双击 `deploy.bat` 。它会自动：
 
