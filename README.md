@@ -6,7 +6,7 @@
 
 极域工具包，支持多种控制极域以及学生机房管理助手的工具。StudentMain、Mythware、Jiyu
 
-![截图]((https://cdn.jsdelivr.net/gh/Jsenn123/Picture_bed@main/img/20260626011225601.png))
+![截图](([https://cdn.jsdelivr.net/gh/Jsenn123/Picture_bed@main/img/20260626011225601.png](https://img-blog.csdnimg.cn/60d799d3637b4fe8a99c295a6bad605b.png#pic_center)))
 
 截图（v1.2.1，新版本 UI 已重新设计）
 
