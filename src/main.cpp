@@ -310,7 +310,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     SetUnhandledExceptionFilter(GlobalExceptionHandler);
-    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     InitNTAPI();
 
     HANDLE hToken; OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken);
@@ -355,6 +354,5 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     CreateFloatingWindow(hInstance);
 
     while (GetMessage(&msg, NULL, 0, 0) > 0) { if (!IsDialogMessage(hwnd, &msg)) { TranslateMessage(&msg); DispatchMessage(&msg); } }
-    CoUninitialize();
     return msg.wParam;
 }

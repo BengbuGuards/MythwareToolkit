@@ -3,7 +3,7 @@ cd /d "%~dp0.."
 setlocal enabledelayedexpansion
 set OUTDIR=bin
 set CFLAGS=-O3 -pipe -lntdll -fexec-charset=UTF-8 -Iinclude
-set LFLAGS=-s -mwindows -lcomctl32 -lgdi32 -lgdiplus -lole32 -static
+set LFLAGS=-s -mwindows -lcomctl32 -lgdi32 -static
 
 :: 自动查找 MinGW64
 set MINGW=
