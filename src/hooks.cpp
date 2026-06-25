@@ -25,16 +25,18 @@ DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter) {
     return 0;
 }
 
+#ifndef UIACCESS_BUILD
+// 便携版：轮询维持置顶（UIAccess 版自带真正置顶，不需要）
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
     while (true) {
-        // 窗口隐藏时不抢置顶，避免和极域黑屏窗口 Z 序打架导致闪烁
         if (hwnd && IsWindow(hwnd) && IsWindowVisible(hwnd)) {
             SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             Sleep(250);
         } else {
-            Sleep(1000);  // 隐藏时降低检查频率
+            Sleep(1000);
         }
     }
     return 0L;
 }
+#endif
