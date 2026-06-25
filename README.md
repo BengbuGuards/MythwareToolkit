@@ -8,7 +8,7 @@
 
 ![截图](https://raw.githubusercontent.com/Jsenn123/Picture_bed/main/img/20260626011225601.png)
 
-截图（v1.2.1，新版本 UI 已重新设计）
+截图（v2.1.1，新版本 UI ）
 
 **当前版本：v2.1.1**
 
