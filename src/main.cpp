@@ -27,7 +27,7 @@ VBRandomEngine  VBMath;
 NTSTATUS (NTAPI *NtSuspendProcess)(IN HANDLE Process);
 NTSTATUS (NTAPI *NtResumeProcess)(IN HANDLE Process);
 
-static LPCSTR helpText = "极域工具包 v2.1 | 小流汗黄豆 | 交流群828869154（进群请注明极域工具包）\n\
+static LPCSTR helpText = "极域工具包 v2.1.1 | 小流汗黄豆 | 交流群828869154（进群请注明极域工具包）\n\
 额外功能：1. 快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
 2. 悬浮窗左键打开主面板，右键直接切换广播窗口化/全屏化，可拖拽移动\n\
 3. 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
@@ -108,7 +108,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             char szVersion[BUFSIZ] = {};
             sprintf(szVersion, "系统版本：%u.%u.%u %d-bit\n程序版本：%s %d-bit\n",
                 vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber,
-                (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, "2.1.0", sizeof(PVOID)*8);
+                (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 || si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_IA64) ? 64 : 32, "2.1.1", sizeof(PVOID)*8);
             sOutPut += szVersion;
             EnableDebugPrivilege();
             w = GetSystemMetrics(SM_CXSCREEN) - 1; h = GetSystemMetrics(SM_CYSCREEN) - 1;
@@ -144,6 +144,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                 L + 8, y + 64, 144, 30, hwnd, HMENU(1014), hi, NULL);
             CreateWindow(WC_BUTTON, "动态密码计算器", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                 L + 158, y + 64, 144, 30, hwnd, HMENU(1015), hi, NULL);
+            CreateWindow(WC_BUTTON, "退出黑屏", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+                L + 8, y + 100, LW - 16, 28, hwnd, HMENU(1021), hi, NULL);
 
             y = 58; int gap = RW - 16 - 134*2;
             CreateWindow(WC_BUTTON, "高级工具", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, R, y, RW, 138, hwnd, NULL, hi, NULL);
@@ -257,6 +259,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                 }
                 case 1019: RunEmbeddedExe(2, "\\MeltdownDFC.exe"); break;
                 case 1020: RunEmbeddedExe(3, "\\crdisk.exe"); break;
+                case 1021: ExitBlackScreen(); break;
             }
             return 0;
         }

@@ -145,3 +145,82 @@ void ControlMythware(BOOL kill) {
         CloseHandle(handle); CloseHandle(token);
     }
 }
+
+// ── 退出黑屏安静：多级递进，尽可能不杀进程 ──
+static BOOL CALLBACK FindBlackScreenProc(HWND hWnd, LPARAM lParam) {
+    if (!IsWindowVisible(hWnd)) return TRUE;
+    LONG ex = GetWindowLong(hWnd, GWL_EXSTYLE);
+    if (!(ex & WS_EX_TOPMOST)) return TRUE;
+    RECT r; GetWindowRect(hWnd, &r);
+    int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
+    if (r.right - r.left < sw || r.bottom - r.top < sh) return TRUE;
+    *(HWND*)lParam = hWnd;
+    return FALSE;
+}
+
+void ExitBlackScreen() {
+    LOG_INFO("ExitBlackScreen start");
+    HWND hBlack = NULL;
+    EnumWindows(FindBlackScreenProc, (LPARAM)&hBlack);
+
+    if (!hBlack) {
+        LOG_INFO("No black screen window found");
+        SetWindowText(TxOut, "未检测到黑屏窗口");
+        return;
+    }
+
+    // ── 第1级：悄悄隐藏黑窗 ──
+    ShowWindow(hBlack, SW_HIDE);
+    Sleep(200);
+    if (!IsWindowVisible(hBlack)) {
+        LOG_INFO("Level 1: black screen hidden (hwnd=%p)", hBlack);
+        SetWindowText(TxOut, "已隐藏黑屏（第1级）");
+        return;
+    }
+
+    // ── 第2级：取消置顶 + 最小化 ──
+    LOG_INFO("Level 1 failed, trying level 2");
+    SetWindowPos(hBlack, HWND_BOTTOM, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    ShowWindow(hBlack, SW_MINIMIZE);
+    Sleep(200);
+    if (!IsWindowVisible(hBlack) || IsIconic(hBlack)) {
+        LOG_INFO("Level 2: black screen minimized");
+        SetWindowText(TxOut, "已退出黑屏（第2级）");
+        return;
+    }
+
+    // ── 第3级：模拟 ESC 键 ──
+    LOG_INFO("Level 2 failed, trying level 3 (ESC)");
+    SetForegroundWindow(hBlack);
+    Sleep(50);
+    keybd_event(VK_ESCAPE, 0, 0, 0);
+    keybd_event(VK_ESCAPE, 0, KEYEVENTF_KEYUP, 0);
+    Sleep(300);
+    if (!IsWindowVisible(hBlack)) {
+        LOG_INFO("Level 3: ESC closed black screen");
+        SetWindowText(TxOut, "已退出黑屏（第3级）");
+        return;
+    }
+
+    // ── 第4级：请求用户确认后杀进程 ──
+    LOG_INFO("Level 3 failed, asking user for kill permission");
+    int id = MessageBox(NULL,
+        "无法通过常规方式退出黑屏安静。\n\n"
+        "是否杀掉极域进程？\n"
+        "点是：强制结束极域（教师端会显示学生离线）\n"
+        "点否：保持现状",
+        "退出黑屏", MB_YESNO | MB_ICONWARNING | MB_SETFOREGROUND);
+    if (id == IDYES) {
+        if (KillProcess(GetProcessIDFromName(MythwareFilename), KILL_FORCE)) {
+            LOG_INFO("Level 4: killed StudentMain.exe");
+            SetWindowText(TxOut, "已杀掉极域进程");
+        } else {
+            SetWindowText(TxOut, "杀进程失败");
+        }
+    } else {
+        LOG_INFO("User declined kill");
+        SetWindowText(TxOut, "无法退出黑屏");
+    }
+    UpdateMythwareStatus();
+}

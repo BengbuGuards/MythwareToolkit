@@ -120,6 +120,7 @@ const char* GetRunLevelString();
 void        UpdateMythwareStatus();
 void        ToggleBroadcastWindow();
 void        ControlMythware(BOOL kill);
+void        ExitBlackScreen();
 
 // hooks
 DWORD WINAPI KeyHookThreadProc(LPVOID lpParameter);
