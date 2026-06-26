@@ -1,3 +1,4 @@
+// hooks.cpp — 键盘/鼠标钩子线程、窗口置顶线程
 #include "globals.h"
 
 LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {

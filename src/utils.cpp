@@ -1,3 +1,4 @@
+// utils.cpp — 日志、异常处理、CBT钩子、随机标题
 #include "globals.h"
 
 static HANDLE g_hLogFile = INVALID_HANDLE_VALUE;

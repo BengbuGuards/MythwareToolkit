@@ -17,12 +17,13 @@
 ### Bug 修复
 - **修复 ThreadProc Z 序闪烁**：窗口隐藏时跳过置顶、降低轮询频率
 - **修复找不到极域进程**：`UpdateMythwareStatus` + `ControlMythware` 多项进程名匹配 + 详细日志
-- **修复对话框被截屏**：启动时挂永久 WH_CBT 钩子，所有弹出窗口自动防截屏
+- **修复悬浮窗/对话框被截屏**：悬浮窗 `WM_CREATE` 加 `SetWindowDisplayAffinity`；启动时挂永久 WH_CBT 钩子，所有主线程弹窗自动防截屏
 
 ### 构建 / 脚本
-- **`scripts/package.bat`**：一键编译+签名+打包 ZIP → `bin/pkg/MythwareToolkit.zip`
+- **`scripts/package.bat`**：编译+签名+打包 ZIP，一步到位
 - **`scripts/cleanup.bat`**：一键清理证书、程序、快捷方式、临时文件
-- **bin 目录**：`.o`/`.res`/`.exe` → `bin/`，打包输出 → `bin/pkg/`
+- **bin 目录**：`.o`/`.res`/`.exe` → `bin/`，产出 → `bin/pkg/`
+- **源码注释**：13 个源文件全部添加模块说明注释
 
 ### 文档
 - **README 目录**：章节索引快速跳转

@@ -1,3 +1,4 @@
+// floating.cpp — 圆形悬浮窗（图标、拖拽、右键菜单）
 #include "floating.h"
 
 #define FLOAT_SIZE  33
@@ -91,6 +92,9 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
                 LOG_INFO("FLOATICO loaded OK (hwnd=%p)", hWnd);
             }
 
+            // 防教师端截屏：优先 WDA_EXCLUDEFROMCAPTURE，失败回退 WDA_MONITOR（黑屏）
+            if (!SetWindowDisplayAffinity(hWnd, WDA_EXCLUDEFROMCAPTURE))
+                SetWindowDisplayAffinity(hWnd, WDA_MONITOR);
             HRGN hRgn = CreateEllipticRgn(0, 0, FLOAT_SIZE + 1, FLOAT_SIZE + 1);
             SetWindowRgn(hWnd, hRgn, TRUE);
             SetTimer(hWnd, 1, 400, NULL);
@@ -220,7 +224,7 @@ HWND CreateFloatingWindow(HINSTANCE hInstance) {
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.lpfnWndProc = FloatingWndProc;
     wc.hInstance = hInstance;
-    wc.hCursor = LoadCursor(NULL, IDC_HAND);
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     wc.lpszClassName = "FloatingWnd";
     if (!RegisterClassEx(&wc)) {
@@ -241,6 +245,7 @@ HWND CreateFloatingWindow(HINSTANCE hInstance) {
         return NULL;
     }
     ShowWindow(g_hFloating, SW_SHOW);
+    SetWindowDisplayAffinity(g_hFloating, WDA_EXCLUDEFROMCAPTURE);
     LOG_INFO("CreateFloatingWindow OK (hwnd=%p)", g_hFloating);
     return g_hFloating;
 }

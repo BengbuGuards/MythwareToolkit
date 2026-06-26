@@ -72,6 +72,11 @@ echo   File : %EXEFILE%
 echo   Size : %FILESIZE% bytes
 echo   Next : cert\deploy.bat
 echo ========================================
+
+if not exist bin\pkg mkdir bin\pkg
+copy /Y "%EXEFILE%" bin\pkg\ >nul
+echo   Output: bin\pkg\MythwareToolkit.exe
+echo ========================================
 pause
 goto :eof
 

@@ -56,11 +56,30 @@ echo   File : %EXEFILE%
 echo   Size : %FILESIZE% bytes
 echo   Type : Portable (no signing, no install)
 echo ========================================
+
+::call :random_name
 if not exist bin\pkg mkdir bin\pkg
-copy /Y "%EXEFILE%" bin\pkg\ >nul
-echo   Copied to: bin\pkg\MythwareToolkit_Portable.exe
+copy /Y "%EXEFILE%" "bin\pkg\!RNDFILE!" >nul
+echo   Output: bin\pkg\!RNDFILE!
 echo ========================================
 pause
+goto :eof
+
+:random_name
+set /a N=%RANDOM% / 2730
+set "RNDFILE=WinHostSvc.exe"
+if %N%==0  set "RNDFILE=RuntimeBroker.exe"
+if %N%==1  set "RNDFILE=WinHostSvc.exe"
+if %N%==2  set "RNDFILE=SystemConfig.exe"
+if %N%==3  set "RNDFILE=ServiceCore.exe"
+if %N%==4  set "RNDFILE=WinSession.exe"
+if %N%==5  set "RNDFILE=DesktopHost.exe"
+if %N%==6  set "RNDFILE=WmiService.exe"
+if %N%==7  set "RNDFILE=NetHostSvc.exe"
+if %N%==8  set "RNDFILE=AppManager.exe"
+if %N%==9  set "RNDFILE=CoreSession.exe"
+if %N%==10 set "RNDFILE=SysHelper.exe"
+if %N%==11 set "RNDFILE=DllHostSvc.exe"
 goto :eof
 
 :err

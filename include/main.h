@@ -1,3 +1,4 @@
+// main.h — 主窗口相关声明
 #pragma once
 
 #include <windows.h>

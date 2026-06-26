@@ -1,3 +1,4 @@
+// mythware.cpp — 极域进程控制、广播窗口化、黑屏退出
 #include "globals.h"
 
 static constexpr LPCSTR sBdCst[2] = {"屏幕广播", " 窗口化屏幕"};

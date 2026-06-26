@@ -1,3 +1,4 @@
+// process.cpp — 进程查杀、挂起/恢复、状态检测、防杀保护
 #include "globals.h"
 #include <aclapi.h>
 
