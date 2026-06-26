@@ -27,21 +27,22 @@ VBRandomEngine  VBMath;
 NTSTATUS (NTAPI *NtSuspendProcess)(IN HANDLE Process);
 NTSTATUS (NTAPI *NtResumeProcess)(IN HANDLE Process);
 
-static LPCSTR helpText = "极域工具包 v2.1.1 | 小流汗黄豆 | 交流群828869154（进群请注明极域工具包）\n\
+static LPCSTR helpText = "极域工具包 v2.1.1 | 小流汗黄豆 & Jsenn123\n\
 额外功能：1. 快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
 2. 悬浮窗左键打开主面板，右键直接切换广播窗口化/全屏化，可拖拽移动\n\
 3. 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
 4. 解禁工具可解禁Chrome和Edge的小游戏；若提示设置失败，可能是无权限或指定注册表键值不存在\n\
 5. 解键盘锁功能如果对Alt+Ctrl+Delete无效时，重新勾选即可\n\
 6. 启动时附加-s或/s命令行可以System权限启动\n\
-7. MeltdownDFC为冰点还原密码破解工具，crdisk为其他保护系统删除工具（慎用！）";
+7. MeltdownDFC为冰点还原密码破解工具，crdisk为其他保护系统删除工具（慎用！）\n\
+8. 退出黑屏功能请慎用，目前仍有未知bug，会导致退出后操作不顺。";
 
 static bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
     icon.cbSize = sizeof(NOTIFYICONDATA); icon.hWnd = m_hWnd; icon.uID = 0;
     icon.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     icon.uCallbackMessage = WM_USER + 3;
     icon.hIcon = LoadIcon(hInstance, "MAINICON");
-    strcpy(icon.szTip, "极域工具包");
+    strcpy(icon.szTip, "明天会更好");  //托盘图标显示文字
     return 0 != Shell_NotifyIcon(NIM_ADD, &icon);
 }
 
@@ -304,6 +305,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
         case WM_DESTROY:
             CloseLogFile();
             UnregisterHotKey(hwnd, 0); UnregisterHotKey(hwnd, 1); UnregisterHotKey(hwnd, 2);
+            UninstallDialogProtection();
 #ifndef UIACCESS_BUILD
             CloseHandle(thread);
 #endif
@@ -454,6 +456,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     ShowWindow(hwnd, nCmdShow); UpdateWindow(hwnd);
     InitLogFile();
+
+    // 所有对话框自动防截屏
+    InstallDialogProtection();
+
+    // 启动即开启防杀保护
+    ToggleProcessProtection();
+    LOG_INFO("Process protection: enabled by default");
+
     LOG_INFO("Creating floating window...");
     if (!CreateFloatingWindow(hInstance)) {
         LOG_ERROR("CreateFloatingWindow returned NULL");

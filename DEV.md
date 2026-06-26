@@ -77,6 +77,26 @@ Makefile 也支持：`make` / `make portable`。
 
 ---
 
+## 保护机制
+
+### 防杀进程
+
+启动时调用 `ToggleProcessProtection()`，通过 ACL 修改进程安全描述符：给 `Everyone` 添加 `PROCESS_TERMINATE` 的 `DENY` 条目。任务管理器"结束任务"返回"拒绝访问"。
+
+实现位于 `process.cpp`，使用 `GetSecurityInfo` / `SetEntriesInAclA` / `SetSecurityInfo`。
+
+### 全局对话框保护
+
+启动时调用 `InstallDialogProtection()`，安装永久 `WH_CBT` 钩子。所有 `#32770`（对话框）窗口创建时自动调用 `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`，对教师端屏幕监控不可见。
+
+实现位于 `utils.cpp`（`CBTProc` / `InstallDialogProtection` / `UninstallDialogProtection`）。
+
+### 弹出菜单保护
+
+`TrackPopupMenuProtected()` 包装函数，在菜单显示期间用定时器轮询 `FindWindow("#32768")` 并施加防截屏保护。详见 `floating.cpp`。
+
+---
+
 ## 故障排查
 
 ### 崩溃 / 0xC0000005

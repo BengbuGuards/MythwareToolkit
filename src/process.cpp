@@ -1,4 +1,5 @@
 #include "globals.h"
+#include <aclapi.h>
 
 static NTSTATUS (NTAPI *MyNtQuerySystemInformation)
     (IN SYSTEM_INFORMATION_CLASS SystemInformationClass, IN OUT PVOID SystemInformation,
@@ -18,6 +19,94 @@ void InitNTAPI() {
     Set(NtResumeProcess,            GetProcAddress(ntdll, "NtResumeProcess"));
     Set(MyNtQuerySystemInformation, GetProcAddress(ntdll, "NtQuerySystemInformation"));
     Set(RtlNtStatusToDosErrorNoTeb, GetProcAddress(ntdll, "RtlNtStatusToDosErrorNoTeb"));
+}
+
+// ── 防杀进程：通过 ACL 拒绝 PROCESS_TERMINATE ──
+static bool g_bProcessProtected = false;
+
+bool ToggleProcessProtection() {
+    HANDLE hProcess = GetCurrentProcess();
+    PACL pOldDACL = NULL;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+
+    if (!g_bProcessProtected) {
+        // ── 启用保护 ──
+        // 获取当前进程的安全描述符
+        DWORD err1 = GetSecurityInfo(hProcess, SE_KERNEL_OBJECT,
+            DACL_SECURITY_INFORMATION, NULL, NULL,
+            &pOldDACL, NULL, &pSD);
+        if (err1 != ERROR_SUCCESS) {
+            LOG_ERROR("GetSecurityInfo failed: %lu", err1);
+            return false;
+        }
+
+        // 添加 DENY ACE：禁止 Everyone 终止本进程
+        EXPLICIT_ACCESSA ea = {};
+        ea.grfAccessPermissions = PROCESS_TERMINATE;
+        ea.grfAccessMode = DENY_ACCESS;
+        ea.grfInheritance = NO_INHERITANCE;
+        ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+
+        SID_IDENTIFIER_AUTHORITY sia = SECURITY_WORLD_SID_AUTHORITY;
+        PSID pEveryone = NULL;
+        AllocateAndInitializeSid(&sia, 1, SECURITY_WORLD_RID, 0,0,0,0,0,0,0, &pEveryone);
+        ea.Trustee.ptstrName = (LPSTR)pEveryone;
+
+        PACL pNewDACL = NULL;
+        DWORD err2 = SetEntriesInAclA(1, &ea, pOldDACL, &pNewDACL);
+        FreeSid(pEveryone);
+        LocalFree(pSD);
+        if (err2 != ERROR_SUCCESS) {
+            LOG_ERROR("SetEntriesInAcl failed: %lu", err2);
+            return false;
+        }
+
+        DWORD err3 = SetSecurityInfo(hProcess, SE_KERNEL_OBJECT,
+            DACL_SECURITY_INFORMATION, NULL, NULL, pNewDACL, NULL);
+        LocalFree(pNewDACL);
+        if (err3 != ERROR_SUCCESS) {
+            LOG_ERROR("SetSecurityInfo(DENY) failed: %lu", err3);
+            return false;
+        }
+
+        g_bProcessProtected = true;
+        LOG_INFO("Process protection ON: PROCESS_TERMINATE denied");
+        return true;
+
+    } else {
+        // ── 关闭保护 ──
+        PSID pEveryone = NULL;
+        SID_IDENTIFIER_AUTHORITY sia = SECURITY_WORLD_SID_AUTHORITY;
+        AllocateAndInitializeSid(&sia, 1, SECURITY_WORLD_RID, 0,0,0,0,0,0,0, &pEveryone);
+
+        EXPLICIT_ACCESSA ea2 = {};
+        ea2.grfAccessPermissions = PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION |
+                                   SYNCHRONIZE | READ_CONTROL;
+        ea2.grfAccessMode = SET_ACCESS;
+        ea2.grfInheritance = NO_INHERITANCE;
+        ea2.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+        ea2.Trustee.ptstrName = (LPSTR)pEveryone;
+
+        PACL pNewDACL = NULL;
+        DWORD err2 = SetEntriesInAclA(1, &ea2, NULL, &pNewDACL);
+        FreeSid(pEveryone);
+        if (err2 != ERROR_SUCCESS) {
+            LOG_ERROR("SetEntriesInAcl(restore) failed: %lu", err2);
+            return false;
+        }
+
+        err2 = SetSecurityInfo(hProcess, SE_KERNEL_OBJECT,
+            DACL_SECURITY_INFORMATION, NULL, NULL, pNewDACL, NULL);
+        LocalFree(pNewDACL);
+        if (err2 != ERROR_SUCCESS) {
+            LOG_ERROR("SetSecurityInfo(ALLOW) failed: %lu", err2);
+            return false;
+        }
+
+        g_bProcessProtected = false;
+        LOG_INFO("Process protection OFF");
+        return true;
+    }
 }
 
 DWORD GetProcessIDFromName(LPCSTR szName) {

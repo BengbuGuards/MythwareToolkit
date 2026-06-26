@@ -3,29 +3,31 @@
 ## v2.1.1 — 2026-06-25
 
 ### 新功能
-- **退出黑屏安静**：主界面 + 悬浮窗右键均可触发。4 级递进（隐藏黑窗 → 取消置顶最小化 → 模拟 ESC → 确认后杀进程），前 3 级无感，教师端不会发现
+- **退出黑屏安静**：主界面 + 悬浮窗右键均可触发。4 级递进（隐藏黑窗 → 取消置顶最小化 → 模拟 ESC → 确认后杀进程），前 3 级无感
 - **UAC 提权**：MeltdownDFC/crdisk 和解除网络限制点击时自动弹 UAC 提权窗口
-- **极域进程名多样识别**：依次尝试 `StudentMain.exe` / `StudentM.exe` / `StudentMain64.exe` / `Student.exe` / `MasterHelper.exe`，适配不同版本
+- **极域进程名多样识别**：依次尝试 `StudentMain.exe` / `StudentM.exe` / `StudentMain64.exe` / `Student.exe` / `MasterHelper.exe`
+- **防杀进程**：启动即修改进程 ACL，任务管理器"结束任务"直接拒绝访问
+- **全局对话框保护**：所有弹窗（关于/帮助/错误提示等）对教师端监控不可见
 
 ### 置顶机制重构
-- **UIAccess 版移除 ThreadProc**：UIAccess 自带真正置顶，不再轮询线程抢 Z 序（编译宏 `-DUIACCESS_BUILD`）
+- **UIAccess 版移除 ThreadProc**：UIAccess 自带真正置顶（编译宏 `-DUIACCESS_BUILD`）
 - **便携版事件驱动**：新增 `WM_WINDOWPOSCHANGED` 处理，只在被挤下去时才重新置顶
 - **悬浮窗右键菜单**：不再呼出主界面，消除 Z 序闪烁
 
 ### Bug 修复
 - **修复 ThreadProc Z 序闪烁**：窗口隐藏时跳过置顶、降低轮询频率
-- **修复找不到极域进程**：`UpdateMythwareStatus` 和 `ControlMythware` 增加多项进程名匹配 + 详细日志
+- **修复找不到极域进程**：`UpdateMythwareStatus` + `ControlMythware` 多项进程名匹配 + 详细日志
+- **修复对话框被截屏**：启动时挂永久 WH_CBT 钩子，所有弹出窗口自动防截屏
 
 ### 构建 / 脚本
-- **`scripts/package.bat`**：一键编译+签名+打包 ZIP，输出 `bin/pkg/MythwareToolkit.zip`
-- **`scripts/cleanup.bat`**：一键清理证书、程序目录、桌面快捷方式、临时文件（纯 ASCII）
-- **bin 目录结构调整**：`.o`/`.res`/`.exe` → `bin/`，打包输出 → `bin/pkg/`
-- 便携版 `build_portable.bat` 编译后自动复制 EXE 到 `bin/pkg/`
+- **`scripts/package.bat`**：一键编译+签名+打包 ZIP → `bin/pkg/MythwareToolkit.zip`
+- **`scripts/cleanup.bat`**：一键清理证书、程序、快捷方式、临时文件
+- **bin 目录**：`.o`/`.res`/`.exe` → `bin/`，打包输出 → `bin/pkg/`
 
-### 工具 / 文档
-- **README 目录**：添加章节索引，快速跳转
+### 文档
+- **README 目录**：章节索引快速跳转
 - **RELEASE.md**：发行版说明，面向最终用户
-- **简化故障排查说明**：一句话解决方案
+- **DEV.md**：开发者文档（编译部署、脚本、故障排查、附录）
 
 ---
 

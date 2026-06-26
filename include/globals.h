@@ -95,6 +95,8 @@ BOOL        EnableDebugPrivilege();
 LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
+void        InstallDialogProtection();
+void        UninstallDialogProtection();
 void        InitLogFile();
 void        CloseLogFile();
 void        LogWrite(const char* text);
@@ -112,6 +114,7 @@ bool  KillProcess(DWORD dwProcessID, int way);
 bool  KillAllProcessWithName(LPCSTR name, int way);
 BOOL  SuspendProcess(DWORD dwProcessID, BOOL suspend);
 int   GetProcessState(DWORD dwProcessID);
+bool  ToggleProcessProtection();
 
 // mythware
 BOOL        GetMythwarePasswordFromRegedit(char* str);

@@ -270,12 +270,18 @@ BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam) {
     return TRUE;
 }
 
+static HHOOK g_hPermCBT = NULL;
+
+// 永久 CBT 钩子：保护所有对话框不被教师端截屏看到
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HCBT_ACTIVATE) {
         HWND msgHwnd = HWND(wParam);
-        char  szClass[7];
-        GetClassName(msgHwnd, szClass, 7);
+        char  szClass[8];
+        GetClassName(msgHwnd, szClass, 8);
         if (_stricmp("#32770", szClass) == 0) {
+            // 所有对话框对教师端监控不可见
+            SetWindowDisplayAffinity(msgHwnd, WDA_EXCLUDEFROMCAPTURE);
+
             int  nLength = GetWindowTextLength(msgHwnd);
             char szName[nLength + 2];
             GetWindowText(msgHwnd, szName, nLength + 1);
@@ -294,5 +300,17 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam) {
             }
         }
     }
-    return CallNextHookEx(NULL, nCode, wParam, lParam);
+    return CallNextHookEx(g_hPermCBT, nCode, wParam, lParam);
+}
+
+void InstallDialogProtection() {
+    if (!g_hPermCBT)
+        g_hPermCBT = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
+}
+
+void UninstallDialogProtection() {
+    if (g_hPermCBT) {
+        UnhookWindowsHookEx(g_hPermCBT);
+        g_hPermCBT = NULL;
+    }
 }
