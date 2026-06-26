@@ -6,9 +6,9 @@
 
 极域工具包，支持多种控制极域以及学生机房管理助手的工具。StudentMain、Mythware、Jiyu
 
-![截图](https://img-blog.csdnimg.cn/60d799d3637b4fe8a99c295a6bad605b.png#pic_center)
+![截图](https://raw.githubusercontent.com/Jsenn123/Picture_bed/main/img/20260626011225601.png)
 
-截图（v1.2.1，新版本 UI 已重新设计）
+截图（v2.1.1，新版本 UI ）
 
 **当前版本：v2.1.1**
 
@@ -102,7 +102,8 @@ MythwareToolkit/
 ### 超级置顶版（可覆盖任务管理器）
 
 > 下载的文件包应包含：`MythwareToolkit.exe` + `deploy.bat` + `mythware.cer`
-> 如果双击 `MythwareToolkit.exe` 可直接打开，则不需要下列几个步骤
+> 如果双击 `MythwareToolkit.exe` 可直接打开
+> 则不需要下列几个步骤
 
 **1. 首先**，双击 `deploy.bat` 。它会自动：
 
