@@ -42,6 +42,7 @@ MythwareToolkit.zip
 
 - 安装证书到系统受信任根
 - 复制 EXE 到 `C:\Program Files\MythwareToolkit\`
+- 复制 EXE 到 `C:\Program Files\MythwareToolkit\`
 - 创建桌面快捷方式
 
 **3.** 从桌面快捷方式启动。
@@ -56,7 +57,6 @@ MythwareToolkit.zip
 - **全面防截屏**：主窗口、悬浮窗、弹窗、菜单均对教师端监控不可见
 - **UAC 提权**：网络限制解除、MeltdownDFC 点击自动弹提权窗口
 - **置顶优化**：超级置顶版不再轮询抢 Z 序，菜单不闪退
-- **极域多版识别**：自动匹配多种极域进程名
 - **崩溃诊断**：崩溃日志含完整寄存器 + 栈回溯，运行日志记录每一步操作
 
 ---
