@@ -1,3 +1,4 @@
+// main.cpp — 程序入口 WinMain + 主窗口消息处理 + 托盘图标 + 内嵌工具启动
 #pragma GCC optimize(3)
 
 #include "globals.h"
@@ -119,16 +120,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 #endif
             keyHook = CreateThread(NULL, 0, KeyHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
             mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
+            // 安装永久 CBT 钩子：所有主线程弹窗自动防教师端截屏
+            SetWindowsHookEx(WH_CBT, CBTProc, GetModuleHandle(NULL), GetCurrentThreadId());
             SetTimer(hwnd, 1, 1000, NULL); SetTimer(hwnd, 2, 2000, NULL);
             RegisterHotKey(hwnd, 0, MOD_ALT, 'C'); RegisterHotKey(hwnd, 1, MOD_ALT, 'W');
             if (!RegisterHotKey(hwnd, 2, MOD_ALT, 'B'))
                 if (MessageBox(hwnd, "注册系统级热键 Alt+B 失败，有可能该应用的另一实例还在运行，请先关闭它再重新启动本程序！否则唤出窗口功能将失效！若点击「取消」则阻止程序继续启动",
-                    "极 域 工 具 包", MB_OKCANCEL | MB_ICONWARNING) == IDCANCEL) { PostQuitMessage(0); return FALSE; }
+                    "明 天 会 更 好", MB_OKCANCEL | MB_ICONWARNING) == IDCANCEL) { PostQuitMessage(0); return FALSE; }
 
             HINSTANCE hi = ((LPCREATESTRUCT)lParam)->hInstance;
             int L = 12, R = 330, LW = 310, RW = 290, y;
 
-            TxLnk = CreateWindow("SysLink", "极域工具包 <a href=\"https://github.com/BengbuGuards/MythwareToolkit\">GitHub</a>",
+            TxLnk = CreateWindow("SysLink", "极域工具包 <a href=\"https://github.com/Jsenn123/MythwareToolkit-Jsen\">GitHub</a>",
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP, L + 2, 6, 220, 22, hwnd, HMENU(1001), hi, NULL);
             BtAbt = CreateWindow(WC_BUTTON, "关于/帮助", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                 R + RW - 100, 2, 100, 28, hwnd, HMENU(1002), hi, NULL);

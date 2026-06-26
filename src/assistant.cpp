@@ -1,3 +1,4 @@
+// assistant.cpp — 学生机房管理助手检测与杀进程
 #include "globals.h"
 
 void KillStudentAssistant() {

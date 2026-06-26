@@ -1,3 +1,4 @@
+// globals.h — 全局宏定义、变量声明、函数原型
 #pragma once
 
 #include <windows.h>

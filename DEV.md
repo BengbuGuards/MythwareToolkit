@@ -37,17 +37,10 @@ cert\deploy.bat      →  部署到 C:\Program Files\
 
 | 脚本 | 做什么 | 输出 |
 |------|--------|------|
-| `scripts\build.bat` | 编译 + 自动签名 | `bin\MythwareToolkit.exe` |
-| `scripts\package.bat` | 编译+签名+验证签名+打包 ZIP | `bin\pkg\MythwareToolkit.zip` |
+| `scripts\build.bat` | 编译 + 自动签名 + 随机命名输出到 `bin/pkg/` | `bin\MythwareToolkit.exe` |
+| `scripts\build_portable.bat` | 编译便携版 + 随机命名输出到 `bin/pkg/` | `bin\MythwareToolkit_Portable.exe` |
+| `scripts\package.bat` | 打包 ZIP（EXE + deploy.bat + mythware.cer） | `bin\pkg\MythwareToolkit.zip` |
 | `cert\deploy.bat` | 部署到 Program Files + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
-
-### 便携版（免签名免安装）
-
-```batch
-scripts\build_portable.bat
-```
-
-输出 `bin\MythwareToolkit_Portable.exe`，同时自动复制到 `bin\pkg\`。
 
 ### 两个版本的区别
 
@@ -65,6 +58,7 @@ scripts\build_portable.bat
 | 脚本 | 用途 |
 |------|------|
 | `scripts\cleanup.bat` | 管理员运行 → 清除证书/程序/快捷方式/临时文件 |
+| `scripts\sign.bat` | 手动签名 `bin\MythwareToolkit.exe`（build.bat 已自动调用） |
 | `convert_icon.bat` | PNG→ICO 多分辨率高清转换 → `res\float.ico` |
 
 ### 依赖
@@ -87,9 +81,13 @@ Makefile 也支持：`make` / `make portable`。
 
 ### 全局对话框保护
 
-启动时调用 `InstallDialogProtection()`，安装永久 `WH_CBT` 钩子。所有 `#32770`（对话框）窗口创建时自动调用 `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`，对教师端屏幕监控不可见。
+启动时在 `WM_CREATE` 中安装永久 `WH_CBT` 钩子（不存储句柄，进程退出时自动清理）。所有 `#32770`（对话框）窗口激活时自动调用 `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`，对教师端屏幕监控不可见。
 
-实现位于 `utils.cpp`（`CBTProc` / `InstallDialogProtection` / `UninstallDialogProtection`）。
+`CBTProc` 位于 `utils.cpp`，在 `HCBT_ACTIVATE` 中同时处理：按钮文字定制（异常对话框、USB 设置等）和防截屏。永久钩子安装位于 `main.cpp` `WM_CREATE`。
+
+### 悬浮窗保护
+
+`floating.cpp` `WM_CREATE` 中直接调用 `SetWindowDisplayAffinity(hWnd, WDA_EXCLUDEFROMCAPTURE)`。
 
 ### 弹出菜单保护
 

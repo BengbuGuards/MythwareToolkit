@@ -1,3 +1,4 @@
+// bypass.cpp — 注册表解禁、网络/USB限制解除
 #include "globals.h"
 
 // ── FltLib 动态加载（避免启动时依赖 FltLib.dll）────────────

@@ -1,3 +1,4 @@
+// psd.cpp — 动态密码计算器对话框
 #include "globals.h"
 #include "psd.h"
 

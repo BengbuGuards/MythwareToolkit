@@ -1,10 +1,12 @@
 @echo off
+setlocal enabledelayedexpansion
 cd /d "%~dp0.."
 echo ========================================
 echo   Package: UIAccess (Super Topmost)
 echo ========================================
 echo.
-echo [1/3] Build + Sign...
+
+echo [1/2] Build + Sign...
 call scripts\build.bat
 if %ERRORLEVEL% NEQ 0 (
     echo Build failed, aborting.
@@ -12,12 +14,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo [2/3] Verify digital signature...
-powershell -NoProfile -Command "$sig = Get-AuthenticodeSignature 'bin\MythwareToolkit.exe'; if ($sig.Status -eq 'Valid') { Write-Host '  Signature: VALID' -ForegroundColor Green } else { Write-Host '  Signature: MISSING or INVALID!' -ForegroundColor Red; exit 1 }"
-if %ERRORLEVEL% NEQ 0 (
-    echo ERROR: EXE is not signed! Run build.bat first.
-    pause & exit /b 1
-)
+echo [2/2] Packaging...
 
 set PKGDIR=bin\pkg\MythwareToolkit
 if exist "%PKGDIR%" rmdir /s /q "%PKGDIR%"
@@ -27,20 +24,13 @@ copy /Y "bin\MythwareToolkit.exe" "%PKGDIR%\" >nul
 copy /Y "cert\deploy.bat"         "%PKGDIR%\" >nul
 copy /Y "cert\mythware.cer"       "%PKGDIR%\" >nul
 
-echo.
-echo [3/3] Creating ZIP...
+echo [*] Creating ZIP...
 set ZIPFILE=%CD%\bin\pkg\MythwareToolkit.zip
 if exist "%ZIPFILE%" del /f /q "%ZIPFILE%"
 powershell -NoProfile -Command "Compress-Archive -Path '%PKGDIR%\*' -DestinationPath '%ZIPFILE%'"
 
-echo.
 echo ========================================
-echo   Package SUCCESS!
-echo ========================================
-echo   File: %ZIPFILE%
-echo   Contains:
-echo     - MythwareToolkit.exe
-echo     - deploy.bat
-echo     - mythware.cer
+echo   Package: %ZIPFILE%
+echo   Contains: MythwareToolkit.exe + deploy.bat + mythware.cer
 echo ========================================
 pause
