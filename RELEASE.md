@@ -43,6 +43,7 @@ MythwareToolkit.zip
 - 安装证书到系统受信任根
 - 复制 EXE 到 `C:\Program Files\MythwareToolkit\`
 - 复制 EXE 到 `C:\Program Files\MythwareToolkit\`
+- 复制 EXE 到 `C:\Program Files\MythwareToolkit\`
 - 创建桌面快捷方式
 
 **3.** 从桌面快捷方式启动。
