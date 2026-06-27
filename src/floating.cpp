@@ -105,6 +105,7 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             break;
         }
         case WM_TIMER:
+            SetWindowDisplayAffinity(hWnd, WDA_EXCLUDEFROMCAPTURE);
             SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             break;
@@ -254,5 +255,13 @@ void DestroyFloatingWindow() {
     if (g_hFloating && IsWindow(g_hFloating)) {
         DestroyWindow(g_hFloating);
         g_hFloating = NULL;
+    }
+}
+
+void ToggleFloatingWindow() {
+    if (g_hFloating && IsWindowVisible(g_hFloating)) {
+        ShowWindow(g_hFloating, SW_HIDE);
+    } else if (g_hFloating && IsWindow(g_hFloating)) {
+        ShowWindow(g_hFloating, SW_SHOW);
     }
 }

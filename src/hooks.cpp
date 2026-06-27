@@ -26,18 +26,20 @@ DWORD WINAPI MouseHookThreadProc(LPVOID lpParameter) {
     return 0;
 }
 
-#ifndef UIACCESS_BUILD
-// 便携版：轮询维持置顶（UIAccess 版自带真正置顶，不需要）
+// 轮询维持置顶：UIAccess 版间隔放长，便携版保持短间隔
 DWORD WINAPI ThreadProc(LPVOID lpParameter) {
     while (true) {
         if (hwnd && IsWindow(hwnd) && IsWindowVisible(hwnd)) {
             SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-            Sleep(250);
+#ifdef UIACCESS_BUILD
+            Sleep(3000);   // UIAccess：长间隔，减少干扰
+#else
+            Sleep(250);    // 便携版：短间隔，维持置顶
+#endif
         } else {
             Sleep(1000);
         }
     }
     return 0L;
 }
-#endif

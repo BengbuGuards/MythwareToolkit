@@ -4,7 +4,9 @@
 
 > **[更新日志](CHANGELOG.md)** | **[开发者文档](DEV.md)**
 
-极域工具包，支持多种控制极域以及学生机房管理助手的工具。StudentMain、Mythware、Jiyu
+>有问题可联系QQ：2969625400
+
+极域工具包，支持极域以及学生机房管理助手的工具。
 
 ![截图](https://raw.githubusercontent.com/Jsenn123/Picture_bed/main/img/20260626011225601.png)
 
@@ -39,22 +41,20 @@ MythwareToolkit/
 
 ---
 
-## v2.1.1
+## 功能
+
+### v2.1.1
 
 - **圆形悬浮窗**：始终置顶，左键切换主面板，中键一键广播窗口化，右键快捷菜单（防截屏），支持拖拽
 - **退出黑屏**：主界面按钮 / 悬浮窗右键，4 级递进（隐藏 → 最小化 → ESC → 确认杀进程）
 - **防杀进程**：启动即开启，任务管理器无法结束本进程
 - **全面防截屏**：主窗口、悬浮窗、所有弹窗和菜单对教师端监控不可见
-- **置顶优化**：UIAccess 版移除轮询线程，便携版改用事件驱动，消除 Z 序闪烁
+- **UI 美化**：两组等高对齐，按钮统一尺寸，窗口紧凑合理
 - **UAC 提权**：网络限制解除、MeltdownDFC 点击即弹提权窗口
 - **崩溃诊断**：完整寄存器 + 栈回溯写入崩溃日志，运行日志记录每一步操作
 - **日志系统**：`MythwareToolkit_run.log` + `MythwareToolkit_crash.log`，追加模式
-- **图标转换**：`convert_icon.bat` 一键 PNG→ICO，多分辨率高清
-- **一键清理**：`scripts/cleanup.bat` 清除证书、程序、快捷方式
-
----
-
-## 功能
+- **图标转换**：仓库里的`convert_icon.bat` 一键 PNG→ICO，多分辨率高清()
+- **一键清理**：仓库里的`scripts/cleanup.bat` 清除证书、程序、快捷方式
 
 ### 极域控制
 
@@ -83,7 +83,6 @@ MythwareToolkit/
   - <kbd>Alt</kbd>+<kbd>B</kbd> — 唤起主界面
   - <kbd>Alt</kbd>+<kbd>W</kbd> — 最小化当前窗口
 - 支持超级置顶（UIAccess），覆盖任务管理器和放大镜
-- 鼠标移至屏幕左上角/右上角弹窗操作
 - 托盘图标常驻，最小化不占任务栏
 
 ---
@@ -92,7 +91,7 @@ MythwareToolkit/
 
 发行版提供两个版本，根据需求选择：
 
-### 便携版（推荐大多数用户）
+### 便携版
 
 下载 `MythwareToolkit_Portable.exe`，**双击运行**即可。
 
@@ -103,8 +102,8 @@ MythwareToolkit/
 ### 超级置顶版（可覆盖任务管理器）
 
 > 下载的文件包应包含：`MythwareToolkit.exe` + `deploy.bat` + `mythware.cer`
-> 如果双击 `MythwareToolkit.exe` 可直接打开
-> 则不需要下列几个步骤
+> ⚠️如果双击 `MythwareToolkit.exe` 可直接打开
+> ⚠️则不需要下列几个步骤
 
 **1. 首先**，双击 `deploy.bat` 。它会自动：
 
@@ -116,7 +115,7 @@ MythwareToolkit/
 
 > **为什么必须用 deploy.bat？** UIAccess 是 Windows 安全机制：exe 必须已签名、证书必须受信任、**且 exe 必须在 `C:\Program Files\` 下**。放桌面或别处会一直弹窗，即使装了证书也没用。`deploy.bat` 一步搞定这三个条件。
 
-> 证书只需装一次，同一台电脑以后不用再装。
+> 证书在非自动恢复机器上只需装一次（正常机房）
 
 ### 两个版本怎么选
 

@@ -38,7 +38,7 @@ cert\deploy.bat      →  部署到 C:\Program Files\
 | 脚本 | 做什么 | 输出 |
 |------|--------|------|
 | `scripts\build.bat` | 编译 + 自动签名 + 随机命名输出到 `bin/pkg/` | `bin\MythwareToolkit.exe` |
-| `scripts\build_portable.bat` | 编译便携版 + 随机命名输出到 `bin/pkg/` | `bin\MythwareToolkit_Portable.exe` |
+| `scripts\build_portable.bat` | 编译便携版 + 输出到 `bin/pkg/` | `bin\MythwareToolkit_Portable.exe` |
 | `scripts\package.bat` | 打包 ZIP（EXE + deploy.bat + mythware.cer） | `bin\pkg\MythwareToolkit.zip` |
 | `cert\deploy.bat` | 部署到 Program Files + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
 
@@ -51,7 +51,7 @@ cert\deploy.bat      →  部署到 C:\Program Files\
 | uiAccess | `true`（超级置顶） | `false`（普通置顶） |
 | 签名 | build.bat 自动签名 | 不需要 |
 | 使用位置 | `C:\Program Files\` | 任意位置 |
-| 置顶机制 | 系统 UIAccess 真正置顶 | 轮询 + `WM_WINDOWPOSCHANGED` |
+| 置顶间隔 | 3000ms | 250ms |
 
 ### 其他工具脚本
 

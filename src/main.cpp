@@ -15,7 +15,7 @@ HWND            BtAbt, BtKmw, TxOut, TxLnk, BtTop, BtCur, BtKbh, BtSnp, BtWnd;
 NOTIFYICONDATA  icon;
 HMENU           hMenu;
 HFONT           hFont;
-int             width = 640, height = 380, w, h, mwSts;
+int             width = 660, height = 335, w, h, mwSts;
 bool            asking = false, ask = false, closingProcess = false;
 DWORD           error = -1;
 POINT           p, pt;
@@ -30,13 +30,13 @@ NTSTATUS (NTAPI *NtResumeProcess)(IN HANDLE Process);
 
 static LPCSTR helpText = "极域工具包 v2.1.1 | 小流汗黄豆 & Jsenn123\n\
 额外功能：1. 快捷键Alt+C双击杀掉当前进程，Alt+W最小化顶层窗口，Alt+B唤起主窗口\n\
-2. 悬浮窗左键打开主面板，右键直接切换广播窗口化/全屏化，可拖拽移动\n\
+2. 悬浮窗左键打开主面板，中键直接切换广播窗口化/全屏化，右键打开快捷菜单，可拖拽移动\n\
 3. 最小化时隐藏到任务栏托盘，左键双击打开主界面，右键单击调出菜单\n\
 4. 解禁工具可解禁Chrome和Edge的小游戏；若提示设置失败，可能是无权限或指定注册表键值不存在\n\
 5. 解键盘锁功能如果对Alt+Ctrl+Delete无效时，重新勾选即可\n\
 6. 启动时附加-s或/s命令行可以System权限启动\n\
 7. MeltdownDFC为冰点还原密码破解工具，crdisk为其他保护系统删除工具（慎用！）\n\
-8. 退出黑屏功能请慎用，目前仍有未知bug，会导致退出后操作不顺。";
+8. 退出黑屏功能请慎用，目前仍有未知bug，会导致退出后操作不顺。（慎用！）";
 
 static bool SetupTrayIcon(HWND m_hWnd, HINSTANCE hInstance) {
     icon.cbSize = sizeof(NOTIFYICONDATA); icon.hWnd = m_hWnd; icon.uID = 0;
@@ -115,9 +115,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             EnableDebugPrivilege();
             w = GetSystemMetrics(SM_CXSCREEN) - 1; h = GetSystemMetrics(SM_CYSCREEN) - 1;
             WM_TASKBAR = RegisterWindowMessage("TaskbarCreated");
-#ifndef UIACCESS_BUILD
             thread = CreateThread(NULL, 0, ThreadProc, NULL, 0, NULL);
-#endif
             keyHook = CreateThread(NULL, 0, KeyHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
             mouHook = CreateThread(NULL, 0, MouseHookThreadProc, NULL, CREATE_SUSPENDED, NULL);
             // 安装永久 CBT 钩子：所有主线程弹窗自动防教师端截屏
@@ -129,7 +127,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                     "明 天 会 更 好", MB_OKCANCEL | MB_ICONWARNING) == IDCANCEL) { PostQuitMessage(0); return FALSE; }
 
             HINSTANCE hi = ((LPCREATESTRUCT)lParam)->hInstance;
-            int L = 12, R = 330, LW = 310, RW = 290, y;
+            int L = 14, R = 342, LW = 320, RW = 290, y;
 
             TxLnk = CreateWindow("SysLink", "极域工具包 <a href=\"https://github.com/Jsenn123/MythwareToolkit-Jsen\">GitHub</a>",
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP, L + 2, 6, 220, 22, hwnd, HMENU(1001), hi, NULL);
@@ -138,31 +136,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 
             char str[BUFSIZ] = {}; LPCSTR psd;
             if (!GetMythwarePasswordFromRegedit(str)) psd = "获取密码失败"; else psd = str;
-            CreateWindow(WC_STATIC, "极域密码:", WS_CHILD | WS_VISIBLE, L + 2, 32, 56, 22, hwnd, NULL, hi, NULL);
+            // 极域密码
+            CreateWindow(WC_STATIC, "极域密码:", WS_CHILD | WS_VISIBLE, L + 218, 8, 72, 20, hwnd, NULL, hi, NULL);
             CreateWindowEx(WS_EX_CLIENTEDGE, WC_EDIT, psd, WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_READONLY,
-                L + 62, 30, LW - 68, 22, hwnd, HMENU(1003), hi, NULL);
+                L + 292, 6, 200, 22, hwnd, HMENU(1003), hi, NULL);
 
-            y = 58;
-            CreateWindow(WC_BUTTON, "极域控制", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, L, y, LW, 138, hwnd, NULL, hi, NULL);
+            y = 50;
+            // 左侧：极域控制
+            CreateWindow(WC_BUTTON, "极域控制", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, L, y, LW, 150, hwnd, NULL, hi, NULL);
+            CreateWindow(WC_BUTTON, "杀掉学生机房管理助手", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+                L + 10, y + 18, LW - 20, 30, hwnd, HMENU(1006), hi, NULL);
             BtKmw = CreateWindow(WC_BUTTON, "杀掉极域", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_SPLITBUTTON,
-                L + 8, y + 16, LW - 16, 40, hwnd, HMENU(1004), hi, NULL);
+                L + 10, y + 52, LW - 20, 40, hwnd, HMENU(1004), hi, NULL);
             CreateWindow(WC_BUTTON, "广播窗口化", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON | WS_DISABLED,
-                L + 8, y + 64, 144, 30, hwnd, HMENU(1014), hi, NULL);
+                L + 10, y + 100, 140, 30, hwnd, HMENU(1014), hi, NULL);
             CreateWindow(WC_BUTTON, "动态密码计算器", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                L + 158, y + 64, 144, 30, hwnd, HMENU(1015), hi, NULL);
-            CreateWindow(WC_BUTTON, "退出黑屏", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                L + 8, y + 100, LW - 16, 28, hwnd, HMENU(1021), hi, NULL);
+                L + 156, y + 100, 140, 30, hwnd, HMENU(1015), hi, NULL);
 
-            y = 58; int gap = RW - 16 - 134*2;
-            CreateWindow(WC_BUTTON, "高级工具", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, R, y, RW, 138, hwnd, NULL, hi, NULL);
-            CreateWindow(WC_BUTTON, "一键解禁系统程序", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8, y + 16, 134, 30, hwnd, HMENU(1007), hi, NULL);
-            CreateWindow(WC_BUTTON, "重启资源管理器", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8 + 134 + gap, y + 16, 134, 30, hwnd, HMENU(1010), hi, NULL);
-            CreateWindow(WC_BUTTON, "解除极域网络限制", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8, y + 54, 134, 30, hwnd, HMENU(1008), hi, NULL);
-            CreateWindow(WC_BUTTON, "解除极域U盘限制", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8 + 134 + gap, y + 54, 134, 30, hwnd, HMENU(1009), hi, NULL);
-            CreateWindow(WC_BUTTON, "MeltdownDFC", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8, y + 92, 134, 24, hwnd, HMENU(1019), hi, NULL);
-            CreateWindow(WC_BUTTON, "crdisk", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 8 + 134 + gap, y + 92, 134, 24, hwnd, HMENU(1020), hi, NULL);
+            y = 52; int gap = RW - 16 - 134*2;
+            // 右侧：高级工具
+            CreateWindow(WC_BUTTON, "高级工具", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, R, y, RW, 150, hwnd, NULL, hi, NULL);
+            CreateWindow(WC_BUTTON, "一键解禁系统程序", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10, y + 18, 134, 30, hwnd, HMENU(1007), hi, NULL);
+            CreateWindow(WC_BUTTON, "重启资源管理器", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10 + 134 + gap, y + 18, 134, 30, hwnd, HMENU(1010), hi, NULL);
+            CreateWindow(WC_BUTTON, "解除极域网络限制", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10, y + 54, 134, 30, hwnd, HMENU(1008), hi, NULL);
+            CreateWindow(WC_BUTTON, "解除极域U盘限制", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10 + 134 + gap, y + 54, 134, 30, hwnd, HMENU(1009), hi, NULL);
+            CreateWindow(WC_BUTTON, "MeltdownDFC", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10, y + 90, 134, 26, hwnd, HMENU(1019), hi, NULL);
+            CreateWindow(WC_BUTTON, "crdisk", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10 + 134 + gap, y + 90, 134, 26, hwnd, HMENU(1020), hi, NULL);
+            CreateWindow(WC_BUTTON, "退出黑屏", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10, y + 120, 134, 26, hwnd, HMENU(1021), hi, NULL);
+            CreateWindow(WC_BUTTON, "显隐悬浮窗", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, R + 10 + 134 + gap, y + 120, 134, 26, hwnd, HMENU(1022), hi, NULL);
 
-            y = 246; int totalW = LW + RW + 8;
+            y = 216; int totalW = LW + RW + 8;
             CreateWindow(WC_BUTTON, "功能开关", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, L, y, totalW, 52, hwnd, NULL, hi, NULL);
             BtTop = CreateWindow(WC_BUTTON, "置顶此窗口", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, L + 14, y + 16, 94, 22, hwnd, HMENU(1016), hi, NULL);
             SendMessage(BtTop, BM_SETCHECK, BST_CHECKED, 0);
@@ -171,8 +174,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             BtSnp = CreateWindow(WC_BUTTON, "防止截屏", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX | (IsWindows7OrGreater() ? 0 : WS_DISABLED), R + 10, y + 16, 80, 22, hwnd, HMENU(1011), hi, NULL);
             SendMessage(BtSnp, BM_SETCHECK, BST_CHECKED, 0); SendMessage(hwnd, WM_COMMAND, 1011, 0);
             BtWnd = CreateWindow(WC_BUTTON, "启用鼠标检测弹窗", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, R + 100, y + 16, 170, 22, hwnd, HMENU(1012), hi, NULL);
-
-            CreateWindow(WC_BUTTON, "杀掉学生机房管理助手", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON, L, 196, totalW, 44, hwnd, HMENU(1013), hi, NULL);
 
             TxOut = CreateWindow(STATUSCLASSNAME, "等待操作", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, hwnd, HMENU(1005), hi, NULL);
             int pts[2] = {420, -1}; SendMessage(TxOut, SB_SETPARTS, WPARAM(2), LPARAM(pts));
@@ -204,7 +205,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
 
         case WM_COMMAND: {
             switch (LOWORD(wParam)) {
-                case 1002: MessageBox(NULL, helpText, "关于/帮助", MB_OK | MB_ICONINFORMATION); break;
+                case 1002: {
+                    static bool bAboutOpen = false;
+                    if (!bAboutOpen) {
+                        bAboutOpen = true;
+                        MessageBox(NULL, helpText, "关于/帮助", MB_OK | MB_ICONINFORMATION);
+                        bAboutOpen = false;
+                    }
+                    break;
+                }
+                case 1006: KillStudentAssistant(); break;
                 case 1004: ControlMythware(FALSE); UpdateMythwareStatus(); break;
                 case 1007: UnlockSystemPrograms(hwnd); break;
                 case 1008: {
@@ -251,14 +261,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                 case 1016: {
     LRESULT check = SendMessage(BtTop, BM_GETCHECK, 0, 0);
     if (check == BST_CHECKED) {
-#ifndef UIACCESS_BUILD
         ResumeThread(thread);
-#endif
     } else {
         SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-#ifndef UIACCESS_BUILD
         SuspendThread(thread);
-#endif
     }
     break;
 }
@@ -279,6 +285,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                 case 1019: RunEmbeddedExe(2, "\\MeltdownDFC.exe"); break;
                 case 1020: RunEmbeddedExe(3, "\\crdisk.exe"); break;
                 case 1021: ExitBlackScreen(); break;
+                case 1022: ToggleFloatingWindow(); break;
             }
             return 0;
         }
@@ -292,6 +299,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             return 0;
 
         case WM_TIMER:
+            // 定时重设防截屏保护，防止被外部清除
+            if (SendMessage(BtSnp, BM_GETCHECK, 0, 0) == BST_CHECKED)
+                SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
             switch (wParam) {
                 case 1: if (!asking && ask) {
                     GetCursorPos(&p);
@@ -309,9 +319,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             CloseLogFile();
             UnregisterHotKey(hwnd, 0); UnregisterHotKey(hwnd, 1); UnregisterHotKey(hwnd, 2);
             UninstallDialogProtection();
-#ifndef UIACCESS_BUILD
             CloseHandle(thread);
-#endif
             CloseHandle(keyHook); CloseHandle(mouHook);
             Shell_NotifyIcon(NIM_DELETE, &icon); UnhookWindowsHookEx(mseHook); UnhookWindowsHookEx(kbdHook);
             break;
@@ -352,13 +360,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                         HMENU hSplitMenu = CreatePopupMenu();
                         AppendMenu(hSplitMenu, MF_BYPOSITION, 1, (mwSts != 1) ? "挂起极域" : "恢复极域");
                         EnableMenuItem(hSplitMenu, 1, mwSts != 2 ? MF_ENABLED : MF_GRAYED);
-#ifndef UIACCESS_BUILD
-                        SuspendThread(thread);
-#endif
+        SuspendThread(thread);
                         int i = TrackPopupMenuProtected(hSplitMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD, ptBtn.x, ptBtn.y, hwnd);
-#ifndef UIACCESS_BUILD
-                        ResumeThread(thread);
-#endif
+        ResumeThread(thread);
                         if (i == 1) { BOOL sts = SuspendProcess(GetProcessIDFromName(MythwareFilename), !mwSts); SetWindowText(TxOut, sts ? "挂起/恢复成功" : "挂起/恢复失败"); UpdateMythwareStatus(); }
                         return TRUE;
                     }
@@ -389,6 +393,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             return DefWindowProc(hwnd, Message, wParam, lParam);
 
         case WM_SIZE: if (wParam == SIZE_MINIMIZED) { ShowWindow(hwnd, SW_HIDE); return TRUE; } break;
+
+        case WM_SHOWWINDOW:
+            if (wParam) SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            break;
 
         case WM_WINDOWPOSCHANGED: {
             // 事件驱动置顶：仅当其他窗口把本窗口挤下去时才重新置顶，避免无意义轮询
