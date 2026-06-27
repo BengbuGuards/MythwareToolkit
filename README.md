@@ -39,7 +39,9 @@ MythwareToolkit/
 
 ---
 
-## v2.1.1
+## 功能
+
+### v2.1.1
 
 - **圆形悬浮窗**：始终置顶，左键切换主面板，中键一键广播窗口化，右键快捷菜单（防截屏），支持拖拽
 - **退出黑屏**：主界面按钮 / 悬浮窗右键，4 级递进（隐藏 → 最小化 → ESC → 确认杀进程）
@@ -49,12 +51,8 @@ MythwareToolkit/
 - **UAC 提权**：网络限制解除、MeltdownDFC 点击即弹提权窗口
 - **崩溃诊断**：完整寄存器 + 栈回溯写入崩溃日志，运行日志记录每一步操作
 - **日志系统**：`MythwareToolkit_run.log` + `MythwareToolkit_crash.log`，追加模式
-- **图标转换**：`convert_icon.bat` 一键 PNG→ICO，多分辨率高清
-- **一键清理**：`scripts/cleanup.bat` 清除证书、程序、快捷方式
-
----
-
-## 功能
+- **图标转换**：仓库里的`convert_icon.bat` 一键 PNG→ICO，多分辨率高清()
+- **一键清理**：仓库里的`scripts/cleanup.bat` 清除证书、程序、快捷方式
 
 ### 极域控制
 
