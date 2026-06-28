@@ -8,9 +8,19 @@
 
 极域工具包，支持极域以及学生机房管理助手的工具。
 
+## 界面展示
+
 ![截图](https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116867.png)
 
-截图（v2.1.1，新版本 UI ）
+主界面（v2.1.1 06-24）
+
+![截图](https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116866.png)
+
+任务栏托盘图标
+
+![截图](https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116868.png)
+
+悬浮窗右键菜单
 
 **当前版本：v2.1.1**
 
