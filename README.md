@@ -10,24 +10,13 @@
 
 ## 界面展示
 
-<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">
 
-<div style="flex-shrink:0;text-align:center">
-  <img src="https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116867.png" width="520">
-  <br>主界面
-</div>
+<img src="https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116867.png" width="400" align="left">
+<img src="https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116866.png" width="180" align="left">
+<img src="https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116868.png" width="200" align="left">
 
-<div style="flex-shrink:0;text-align:center">
-  <img src="https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116866.png" width="200">
-  <br>托盘图标
-</div>
-
-<div style="flex-shrink:0;text-align:center">
-  <img src="https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116868.png" width="240">
-  <br>悬浮窗右键菜单
-</div>
-
-</div>
+<br clear="left">
+*主界面（左） · 任务栏托盘（中） · 悬浮窗右键菜单（右）*
 
 **当前版本：v2.1.1**
 
