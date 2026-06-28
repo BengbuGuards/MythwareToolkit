@@ -8,7 +8,7 @@
 
 极域工具包，支持极域以及学生机房管理助手的工具。
 
-![截图](https://raw.githubusercontent.com/Jsenn123/Picture_bed/main/img/20260626011225601.png)
+![截图](https://github.com/Jsenn123/Picture_bed/blob/main/img/20260628151116867.png)
 
 截图（v2.1.1，新版本 UI ）
 
