@@ -10,8 +10,6 @@
 
 ## 界面展示
 
-## 界面展示
-
 <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">
 
 <div style="flex-shrink:0;text-align:center">
