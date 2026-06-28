@@ -2,6 +2,7 @@
 1 RT_MANIFEST "sys.manifest"
 2 RCDATA "MeltdownDFC.exe"
 3 RCDATA "crdisk.exe"
+FLOATICO ICON "float.ico"
 MAINICON ICON "app.ico"
 
 1 VERSIONINFO

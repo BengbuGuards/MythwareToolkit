@@ -1,2 +1,13 @@
+# IDE
 .vscode/
+
+# Build outputs
 bin/
+*.o
+*.res
+
+# Private keys (must never be committed)
+*.pfx
+
+# Windows
+Thumbs.db
