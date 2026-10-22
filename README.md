@@ -16,7 +16,7 @@
 <br clear="left">
 *主界面（左） · 任务栏托盘（中） · 悬浮窗右键菜单（右）*
 
-**当前版本：v1.3.0**
+**当前版本：v1.3.1**
 
 ---
 
@@ -51,7 +51,7 @@
 
 ### 安全保护
 
-- **防杀进程**：启动即开启，任务管理器无法结束
+- **防杀进程**：启动即开启，任务管理器无法结束（可能会偶遇界面应用主界面会被闪杀，目前还未排查到原因）
 - **全面防截屏**：主界面、悬浮窗、弹窗、右键菜单均对教师端监控不可见
 - **托盘常驻**：最小化不占任务栏，悬浮显示文字
 - **崩溃诊断**：完整寄存器 + 栈回溯写入日志
@@ -69,33 +69,27 @@
 ## 使用教程
 
 #### 两个版本怎么选
+> 提供 **x64** 与 **x86** 两个架构：`MythwareToolkit.v1.3.1.x64.exe` / `MythwareToolkit.v1.3.1.x86.exe`。
+> `v1.3.1` 表示版本号，`x64`/`x86` 表示架构；请选择与系统匹配的版本。
 
-- 优先尝试 `MythwareToolkit.zip` 
-- 如果直接双击里面的 `MythwareToolkit.exe` 不可行
-- 尝试双击 `deploy.bat` 安装证书
-- 如果安装证书后还不可行，安装 `MythwareToolkit_Portable.exe`
+- 优先尝试与系统架构匹配的 `MythwareToolkit.v1.3.1.<架构>.exe`
+- 如果直接双击不可行，下载对应架构的 `MythwareToolkit.v1.3.1.<架构>.zip`
+- 也可尝试便携版 `MythwareToolkit.v1.3.1.<架构>.Portable.exe`
 
 ### 便携版
 
-下载 `MythwareToolkit_Portable.exe`，**双击运行**即可。
+下载与系统架构匹配的 `MythwareToolkit.v1.3.1.<架构>.Portable.exe`（`x64` 或 `x86`），**双击运行**即可。
 
 - ✅ 免安装、免签名
 - ✅ 悬浮窗 + 完整功能
 - ⚠️ 不能覆盖任务管理器（普通置顶）
 
-### 超级置顶版（可覆盖任务管理器）
+### 超级置顶版（`MythwareToolkit.v1.3.1.<架构>.zip` 使用教程）
 
-> 下载的文件包应包含：`MythwareToolkit.exe` + `deploy.bat` + `mythware.cer`
-> ⚠️如果双击 `MythwareToolkit.exe` 可直接打开
-> ⚠️则不需要下列几个步骤
+[从服务器返回一个参照解决方法](/cert/从服务器返回一个参照解决方法.md)
 
-**1. 首先**，双击 `deploy.bat` 。它会自动：
-
-- 安装证书到系统受信任根
-- 复制 `MythwareToolkit.exe` 到 `C:\Program Files\MythwareToolkit\`
-- 创建桌面快捷方式
-
-**2. 之后**从桌面快捷方式启动即可。
+## 一句话解决
+下载与系统架构匹配的 **`MythwareToolkit.v1.3.1.<架构>.zip`**（`x64` 或 `x86`）解压后，双击 `deploy.bat` → 给权限，等待完成 → 从桌面快捷方式启动。
 
 > **为什么必须用 deploy.bat？** UIAccess 是 Windows 安全机制：exe 必须已签名、证书必须受信任、**且 exe 必须在 `C:\Program Files\` 下**。放桌面或别处会一直弹窗，即使装了证书也没用。`deploy.bat` 一步搞定这三个条件。
 
@@ -186,6 +180,6 @@ public class Program
 
 ### 重要提醒
 
-若出现"从服务器返回了一个参照"弹窗，说明 EXE 未签名或证书未安装。运行 `scripts\sign.bat` 一步解决。或手动导入 `cert\RootCA.reg`（原版证书）/ `cert\mythware.cer`（本版证书）。详见 `cert\从服务器返回一个参数解决方法.txt`。机房环境建议关闭 UAC。
+若出现"从服务器返回了一个参照"弹窗，说明 EXE 未签名或证书未安装。运行 `scripts\sign.bat` 一步解决。或手动导入 `cert\RootCA.reg`（原版证书）/ `cert\mythware.cer`（本版证书）。详见 `cert\从服务器返回一个参照解决方法.md`。机房环境建议关闭 UAC。
 
 </details>

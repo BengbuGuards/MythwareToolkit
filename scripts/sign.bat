@@ -8,27 +8,32 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b
 )
 
-if not exist "bin\MythwareToolkit.exe" (
-    echo [ERROR] bin\MythwareToolkit.exe not found
-    echo   Run scripts\build.bat first!
-    pause
-    exit /b 1
-)
-
-echo ========================================
-echo   MythwareToolkit Code Signing
-echo ========================================
-echo   Target: bin\MythwareToolkit.exe
-echo.
-
 set "PS=pwsh"
 where pwsh >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (set "PS=powershell")
 
-%PS% -NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1
+echo ========================================
+echo   MythwareToolkit Code Signing
+echo ========================================
+echo.
 
-if %ERRORLEVEL% NEQ 0 (
-    echo [FAILED] Signing error - check output above
+set SIGNED=0
+for %%A in (x64 x86) do (
+    if exist "bin\MythwareToolkit.v*.%%A.exe" (
+        echo [*] Signing %%A...
+        %PS% -NoProfile -ExecutionPolicy Bypass -File scripts\sign.ps1 -Arch %%A
+        if errorlevel 1 (
+            echo [FAILED] Signing %%A error - check output above
+            pause
+            exit /b 1
+        )
+        set SIGNED=1
+    )
+)
+
+if "%SIGNED%"=="0" (
+    echo [ERROR] bin\MythwareToolkit.v*.x64.exe / .x86.exe not found
+    echo   Run scripts\build.bat first!
     pause
     exit /b 1
 )
@@ -37,7 +42,6 @@ echo ========================================
 echo   Signing SUCCESS!
 echo ========================================
 echo   Cert: cert\mythware.cer
-echo   EXE : bin\MythwareToolkit.exe
 echo   Next: cert\deploy.bat
 echo ========================================
 pause
