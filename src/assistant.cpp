@@ -5,12 +5,12 @@ void KillStudentAssistant() {
     char version[6] = {};
     HKEY retKey;
     LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                  "SOFTWARE\\WOW6432Node\\ZM软件工作室\\学生机房管理助手",
+                  UA("SOFTWARE\\WOW6432Node\\ZM软件工作室\\学生机房管理助手"),
                   0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
     DWORD size = sizeof(version);
     RegQueryValueEx(retKey, "Version", NULL, NULL, (LPBYTE)&version, &size);
     RegCloseKey(retKey);
-    if (ret != ERROR_SUCCESS) { ge; SetWindowText(TxOut, "执行失败，可能未安装学生机房管理助手"); return; }
+    if (ret != ERROR_SUCCESS) { ge; SetWindowText(TxOut, UA("执行失败，可能未安装学生机房管理助手")); return; }
 
     SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
     SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);
@@ -19,9 +19,9 @@ void KillStudentAssistant() {
     CloseServiceHandle(sc); CloseServiceHandle(zm);
     KillAllProcessWithName("zmserv.exe", KILL_DEFAULT);
 
-    std::string sLog = "机房助手版本：";
+    std::string sLog = AS("机房助手版本：");
     sLog += version;
-    sLog += "\nprozs.exe进程名：";
+    sLog += AS("\nprozs.exe进程名：");
 
     SYSTEMTIME time; GetLocalTime(&time);
     int n3 = time.wMonth + time.wDay, n4, n5, n6;
@@ -93,7 +93,7 @@ void KillStudentAssistant() {
         char c[10] = {'p'};
         if (n3 % 2 != 0) c[1]=n5+102, c[2]=n4+98;
         else c[1]=n4+99, c[2]=n5+106;
-        sLog += c; sLog += "（使用7.2前逻辑）"; prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
+        sLog += c; sLog += AS("（使用7.2前逻辑）"); prozsPid = GetProcessIDFromName(strcat(c, ".exe"));
     }
 
     Println(sLog.c_str());
@@ -103,5 +103,5 @@ void KillStudentAssistant() {
     KillAllProcessWithName("jfglzs.exe", KILL_DEFAULT);
     KillAllProcessWithName("jfglzsp.exe", KILL_DEFAULT);
     KillAllProcessWithName("jfglzsn.exe", KILL_DEFAULT);
-    SetWindowText(TxOut, "执行成功");
+    SetWindowText(TxOut, UA("执行成功"));
 }

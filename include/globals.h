@@ -19,9 +19,9 @@
 #define KILL_DEFAULT 2
 #define Set(dest, source) *(PVOID*)&(dest) = (PVOID)(source)
 
-// 日志宏（同时写入内存和文件）
-#define Print(text)   do { const char* _t = FormatLogTime(); sOutPut = sOutPut + _t + text; LogWrite(_t); LogWrite(text); } while(0)
-#define Println(text) Print(text); sOutPut += "\r\n"; LogWrite("\r\n")
+// 日志宏（同时写入内存和文件；LogAppend 内部保证线程安全与单次写入）
+#define Print(text)   LogAppend((text), false)
+#define Println(text) LogAppend((text), true)
 #define ge            error = GetLastError()
 
 // ── 运行权限级别 ────────────────────────────────────────────
@@ -95,13 +95,28 @@ void        PrtError(LPCSTR szDes, LRESULT lResult);
 BOOL        EnableDebugPrivilege();
 LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam);
+void        ApplyAntiCapture(HWND hWnd);   // 防教师端截屏（Win7 自动回退 WDA_MONITOR）
 LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam);
 void        InstallDialogProtection();
 void        UninstallDialogProtection();
 void        InitLogFile();
 void        CloseLogFile();
 void        LogWrite(const char* text);
+void        LogAppend(const char* text, bool newline);   // Print/Println 的底层实现
 void        WriteRuntimeLog(const char* level, const char* where, const char* fmt, ...);
+
+// ── 源码字面量编码适配（Win7 兼容）──────────────────────────
+// 源码以 -fexec-charset=UTF-8 编译，中文字面量是 UTF-8 字节；本程序调用 ANSI (A)
+// 系列 Win32 API，这些 API 用进程 ANSI 代码页(ACP)解码。
+// 
+// 别因为"现在跑在 Win10/11 上"就把 UA()/AS() 拆掉。
+//
+//   UA() — 瞬时生效，返回值仅在本调用表达式内有效（环形缓冲），用于直接传参
+//   AS() — 返回持有的 std::string，用于跨语句保存或字符串拼接
+//
+// 漏包一处编译器不会报错、只会静默乱码；改动后用 scripts/check_literals.py 兜底。
+LPCSTR      UA(const char* u8);
+std::string AS(const char* u8);
 
 // 运行时日志宏（写入 %TEMP%\MythwareToolkit_run.log）
 #define LOG_INFO(fmt, ...)  WriteRuntimeLog("INFO",  __FUNCTION__, fmt, ##__VA_ARGS__)
@@ -120,7 +135,7 @@ bool  ToggleProcessProtection();
 // mythware
 BOOL        GetMythwarePasswordFromRegedit(char* str);
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
-const char* GetRunLevelString();
+std::string GetRunLevelString();
 void        UpdateMythwareStatus();
 void        ToggleBroadcastWindow();
 void        ControlMythware(BOOL kill);

@@ -26,7 +26,7 @@ void UnlockSystemPrograms(HWND hwnd) {
     BYTE cStatus = 0; HKEY retKey; LONG ret;
     DWORD value = 0, out = 0, cb;
     char szPath[BUFSIZ], outputBuf[BUFSIZ];
-    std::string sMsg = "操作完成！已解禁以下项目：";
+    std::string sMsg = AS("操作完成！已解禁以下项目：");
 
     static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> paths[] = {
         {"SOFTWARE\\Policies\\Microsoft\\Windows\\System", {{"DisableCMD","命令提示符"}}},
@@ -48,7 +48,7 @@ void UnlockSystemPrograms(HWND hwnd) {
             ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
             if (out) {
                 ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, "解除%s成功", v.second); Println(outputBuf); sMsg += v.second; sMsg += "、"; }
+                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += AS("、"); }
             }
         }
         RegCloseKey(retKey);
@@ -67,7 +67,7 @@ void UnlockSystemPrograms(HWND hwnd) {
             ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
             if (out == 4) {
                 ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, "解除%s成功", v.second); Println(outputBuf); sMsg += v.second; sMsg += "、"; }
+                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += AS("、"); }
             }
         }
         RegCloseKey(retKey);
@@ -88,7 +88,7 @@ void UnlockSystemPrograms(HWND hwnd) {
         strcat(szPath, p.first);
         RegOpenKeyEx(HKEY_LOCAL_MACHINE, szPath, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
         if (RegDeleteValue(retKey, "debugger") == ERROR_SUCCESS) {
-            cStatus = 1; sprintf(outputBuf, "解除%s成功", p.second); Println(outputBuf); sMsg += p.second; sMsg += "、";
+            cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(p.second)); Println(outputBuf); sMsg += AS(p.second); sMsg += AS("、");
         }
         RegCloseKey(retKey);
     }
@@ -104,21 +104,21 @@ void UnlockSystemPrograms(HWND hwnd) {
     for (auto p : deletePaths) {
         RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
         for (auto v : p.second) {
-            if (RegDeleteValue(retKey, v.first) == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, "解除%s成功", v.second); Println(outputBuf); sMsg += v.second; sMsg += "、"; }
+            if (RegDeleteValue(retKey, v.first) == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += AS("、"); }
         }
         RegCloseKey(retKey);
     }
 
     RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Policies\\Microsoft\\Internet Explorer\\Restrictions", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-    if (RegDeleteValue(retKey, "NoBrowserSaveAs") == ERROR_SUCCESS) { Println("解除IE另存为成功"); sMsg += "IE另存为、"; cStatus = 1; }
+    if (RegDeleteValue(retKey, "NoBrowserSaveAs") == ERROR_SUCCESS) { Println(UA("解除IE另存为成功")); sMsg += AS("IE另存为、"); cStatus = 1; }
     RegCloseKey(retKey);
 
     RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-    if (RegDeleteValue(retKey, "ShowTaskViewButton") == ERROR_SUCCESS) { Println("解除任务视图按钮成功"); sMsg += "任务视图按钮、"; cStatus = 1; }
+    if (RegDeleteValue(retKey, "ShowTaskViewButton") == ERROR_SUCCESS) { Println(UA("解除任务视图按钮成功")); sMsg += AS("任务视图按钮、"); cStatus = 1; }
     RegCloseKey(retKey);
 
     RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-    if (RegDeleteValue(retKey, "Scancode Map") == ERROR_SUCCESS) { Println("解除键盘映射成功"); sMsg += "Tab键（键盘映射）、"; cStatus = 1; }
+    if (RegDeleteValue(retKey, "Scancode Map") == ERROR_SUCCESS) { Println(UA("解除键盘映射成功")); sMsg += AS("Tab键（键盘映射）、"); cStatus = 1; }
     RegCloseKey(retKey);
 
     LPCSTR path = "C:\\Windows\\System32\\drivers\\etc\\hosts";
@@ -145,14 +145,14 @@ void UnlockSystemPrograms(HWND hwnd) {
         }
         CloseHandle(hFile); CloseHandle(hTemp);
         SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL); DeleteFile(path);
-        if (bHandled && MoveFile(tempPath.c_str(), path)) { cStatus = 1; sMsg += "网站限制、"; }
+        if (bHandled && MoveFile(tempPath.c_str(), path)) { cStatus = 1; sMsg += AS("网站限制、"); }
     }
 
-    SetWindowText(TxOut, "设置成功");
+    SetWindowText(TxOut, UA("设置成功"));
     if (cStatus) {
-        sMsg.pop_back(); sMsg.pop_back(); sMsg += "。";
-        sMsg += "请重启资源管理器以应用一些功能，如需恢复Tab键请注销后重新登录。";
-        MessageBox(hwnd, sMsg.c_str(), "说明", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+        sMsg.pop_back(); sMsg.pop_back(); sMsg += AS("。");
+        sMsg += AS("请重启资源管理器以应用一些功能，如需恢复Tab键请注销后重新登录。");
+        MessageBox(NULL, sMsg.c_str(), UA("说明"), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
     }
 }
 
@@ -163,19 +163,22 @@ void RemoveNetworkRestrictions() {
                                     FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hNetFilter != INVALID_HANDLE_VALUE) {
         LOG_INFO("TDNetFilter device opened OK");
-        DeviceIoControl(hNetFilter, 0x120014, NULL, 0, NULL, 0, NULL, 0);
-        PrtError("解除网络限制：发送停止指令", GetLastError());
+        DWORD bytesReturned = 0;
+        if (DeviceIoControl(hNetFilter, 0x120014, NULL, 0, NULL, 0, &bytesReturned, NULL))
+            Print(UA("解除网络限制：发送停止指令成功"));
+        else
+            PrtError(UA("解除网络限制：发送停止指令"), GetLastError());
         CloseHandle(hNetFilter);
     } else {
         LOG_WARN("TDNetFilter device open failed: err=%lu", GetLastError());
-        PrtError("解除网络限制：打开设备", GetLastError());
+        PrtError(UA("解除网络限制：打开设备"), GetLastError());
     }
     // 步骤2：杀掉相关进程
     bool bStateM = KillProcess(GetProcessIDFromName("MasterHelper.exe"), KILL_DEFAULT);
     bool bStateG = KillProcess(GetProcessIDFromName("GATESRV.exe"), KILL_DEFAULT);
     LOG_INFO("Kill MasterHelper=%d GATESRV=%d", bStateM, bStateG);
-    std::string text = "解除网络限制：停止相关进程";
-    Println((text + (bStateM && bStateG ? "成功" : "失败")).c_str());
+    std::string text = AS("解除网络限制：停止相关进程");
+    Println((text + AS(bStateM && bStateG ? "成功" : "失败")).c_str());
     // 步骤3：停止并删除限网驱动服务
     SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
     if (sc) {
@@ -193,32 +196,32 @@ void RemoveNetworkRestrictions() {
     } else {
         LOG_WARN("OpenSCManager failed: err=%lu", GetLastError());
     }
-    text = "解除网络限制：停止限网驱动";
-    Println((text + (bStateM ? "成功" : "失败")).c_str());
-    SetWindowText(TxOut, "设置完成");
+    text = AS("解除网络限制：停止限网驱动");
+    Println((text + AS(bStateM ? "成功" : "失败")).c_str());
+    SetWindowText(TxOut, UA("设置完成"));
 }
 
 void RemoveUSBRestrictions(HWND hwnd) {
     HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
-    int id = MessageBox(hwnd, "请选择关闭USB锁的模式！\n软解禁：向过滤端口发送停止请求\n硬解禁：直接删除过滤驱动，软解禁方案无效时使用！",
+    int id = MessageBox(hwnd, UA("请选择关闭USB锁的模式！\n软解禁：向过滤端口发送停止请求\n硬解禁：直接删除过滤驱动，软解禁方案无效时使用！"),
                         "USB Setting", MB_YESNOCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND);
     UnhookWindowsHookEx(hCBTHook);
     if (id == IDYES) {
         LoadFltLib();
-        if (!pFilterConnect || !pFilterSend) { SetWindowText(TxOut, "设置失败：系统不支持"); return; }
+        if (!pFilterConnect || !pFilterSend) { SetWindowText(TxOut, UA("设置失败：系统不支持")); return; }
         HANDLE hPort = NULL;
         HRESULT hResult = pFilterConnect(L"\\TDFileFilterPort", 0, NULL, 0, NULL, &hPort);
-        if (hResult || hPort <= (HANDLE)0 || GetLastError()) { error = hResult & 0x0000FFFF; SetWindowText(TxOut, "设置失败"); return; }
+        if (hResult || hPort <= (HANDLE)0 || GetLastError()) { error = hResult & 0x0000FFFF; SetWindowText(TxOut, UA("设置失败")); return; }
         int lpInBuffer[4] = {8, 0, 0, 0};
         hResult = pFilterSend(hPort, lpInBuffer, 16, NULL, 0, NULL);
         ge; CloseHandle(hPort);
-        SetWindowText(TxOut, !hResult ? "设置完成" : "设置失败");
+        SetWindowText(TxOut, !hResult ? UA("设置完成") : UA("设置失败"));
     } else if (id == IDNO) {
         SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
         SC_HANDLE hFilt = OpenService(sc, "TDFileFilter", SERVICE_STOP | DELETE);
         SERVICE_STATUS ss = {};
-        if (ControlService(hFilt, SERVICE_CONTROL_STOP, &ss)) SetWindowText(TxOut, "设置成功");
-        else { ge; SetWindowText(TxOut, "设置失败"); }
+        if (ControlService(hFilt, SERVICE_CONTROL_STOP, &ss)) SetWindowText(TxOut, UA("设置成功"));
+        else { ge; SetWindowText(TxOut, UA("设置失败")); }
         DeleteService(hFilt); CloseServiceHandle(sc); CloseServiceHandle(hFilt);
     }
 }

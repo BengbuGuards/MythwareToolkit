@@ -1,9 +1,12 @@
 // floating.cpp — 圆形悬浮窗（图标、拖拽、右键菜单）
 #include "floating.h"
+#undef UNICODE
+#undef _UNICODE
 
 #define FLOAT_SIZE  33
 
 static HWND     g_hFloating = NULL;
+static HWND     g_hLastExternal = NULL;   // 最近一个“外部程序”的前台窗口
 static HICON    g_hIcon     = NULL;
 static POINT    g_dragBase;
 static RECT     g_dragStartRect;
@@ -15,7 +18,7 @@ static UINT_PTR g_menuTimerId = 0;
 static VOID CALLBACK MenuProtectTimer(HWND, UINT, UINT_PTR, DWORD) {
     HWND hMenu = FindWindow("#32768", NULL);
     while (hMenu) {
-        SetWindowDisplayAffinity(hMenu, WDA_EXCLUDEFROMCAPTURE);
+        ApplyAntiCapture(hMenu);
         hMenu = FindWindowEx(NULL, hMenu, "#32768", NULL);
     }
 }
@@ -31,6 +34,21 @@ BOOL TrackPopupMenuProtected(HMENU hMenu, UINT uFlags, int x, int y, HWND hWnd) 
 }
 
 // 验证图标句柄是否有效（避免畸形 .ico 文件导致 DrawIconEx 崩溃）
+// 是否是本程序自己的窗口（含悬浮窗、主窗口、对话框）
+static bool IsOwnWindow(HWND h) {
+    if (!h) return true;
+    DWORD pid = 0;
+    GetWindowThreadProcessId(h, &pid);
+    return pid == GetCurrentProcessId();
+}
+
+// 记录最近一个外部程序的前台窗口：点悬浮窗后前台会变成悬浮窗自己，
+// 需要靠这个值把“最小化焦点窗口”作用到用户真正在用的那个窗口上。
+static void TrackExternalForeground() {
+    HWND fg = GetForegroundWindow();
+    if (fg && !IsOwnWindow(fg)) g_hLastExternal = fg;
+}
+
 static bool IsValidIcon(HICON hIcon) {
     if (!hIcon) return false;
     ICONINFO ii = {};
@@ -79,35 +97,37 @@ static void DrawFloatingContent(HDC hdc) {
 
 LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
+        case WM_SIZE:
+            // 悬浮窗没有任务栏按钮，最小化后会显示异常（无法正常恢复）。
+            // 无论是谁调用了 ShowWindow(SW_MINIMIZE)，这里都立即恢复。
+            if (wParam == SIZE_MINIMIZED) ShowWindow(hWnd, SW_RESTORE);
+            break;
         case WM_CREATE: {
             CREATESTRUCT* cs = (CREATESTRUCT*)lParam;
             LOG_INFO("Floating window WM_CREATE");
-            // 加载悬浮窗专用图标（float.ico），失败则用系统默认
-            g_hIcon = (HICON)LoadImage(cs->hInstance, "FLOATICO", IMAGE_ICON,
-                                       0, 0, LR_DEFAULTSIZE);
+            //如需使用 float.ico 可将 MAINICON 替换为 FLOATICO 。在 res/resource.rc 中
+            g_hIcon = LoadIcon(cs->hInstance, "MAINICON");
             if (!g_hIcon) {
                 g_hIcon = LoadIcon(NULL, IDI_APPLICATION);
-                LOG_WARN("FLOATICO load failed, using IDI_APPLICATION");
-            } else {
-                LOG_INFO("FLOATICO loaded OK (hwnd=%p)", hWnd);
+                LOG_WARN("MAINICON load failed, using IDI_APPLICATION");
             }
 
-            // 防教师端截屏：优先 WDA_EXCLUDEFROMCAPTURE，失败回退 WDA_MONITOR（黑屏）
-            if (!SetWindowDisplayAffinity(hWnd, WDA_EXCLUDEFROMCAPTURE))
-                SetWindowDisplayAffinity(hWnd, WDA_MONITOR);
+            // 防教师端截屏：优先 WDA_EXCLUDEFROMCAPTURE，Win7 回退 WDA_MONITOR（黑屏）
+            ApplyAntiCapture(hWnd);
             HRGN hRgn = CreateEllipticRgn(0, 0, FLOAT_SIZE + 1, FLOAT_SIZE + 1);
             SetWindowRgn(hWnd, hRgn, TRUE);
             SetTimer(hWnd, 1, 400, NULL);
             int sw = GetSystemMetrics(SM_CXSCREEN);
             int sh = GetSystemMetrics(SM_CYSCREEN);
-            SetWindowPos(hWnd, HWND_TOPMOST, sw - FLOAT_SIZE - 14,
-                         (sh - FLOAT_SIZE) / 2, FLOAT_SIZE, FLOAT_SIZE, SWP_NOACTIVATE);
+            SetWindowPos(hWnd, HWND_TOPMOST, (sw - FLOAT_SIZE) / 2, 2,
+                         FLOAT_SIZE, FLOAT_SIZE, SWP_NOACTIVATE);
             break;
         }
         case WM_TIMER:
-            SetWindowDisplayAffinity(hWnd, WDA_EXCLUDEFROMCAPTURE);
+            ApplyAntiCapture(hWnd);
             SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            TrackExternalForeground();
             break;
         case WM_PAINT: {
             PAINTSTRUCT ps;
@@ -178,17 +198,18 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             break;
         }
         case WM_RBUTTONDOWN: {
+            TrackExternalForeground();
             POINT pt; GetCursorPos(&pt);
             HMENU hMenu = CreatePopupMenu();
-            AppendMenu(hMenu, MF_STRING, 1, (hwnd && IsWindowVisible(hwnd)) ? "隐藏面板" : "打开面板");
+            AppendMenu(hMenu, MF_STRING, 1, (hwnd && IsWindowVisible(hwnd)) ? UA("隐藏面板") : UA("打开面板"));
             AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hMenu, MF_STRING, 7, "退出黑屏");
-            AppendMenu(hMenu, MF_STRING, 6, "广播窗口化");
-            AppendMenu(hMenu, MF_STRING, 2, "杀掉极域");
-            AppendMenu(hMenu, MF_STRING, 3, "杀机房助手");
-            AppendMenu(hMenu, MF_STRING, 4, "解禁系统程序");
+            AppendMenu(hMenu, MF_STRING, 7, UA("退出黑屏"));
+            AppendMenu(hMenu, MF_STRING, 6, UA("最小化焦点窗口"));
+            AppendMenu(hMenu, MF_STRING, 2, UA("杀掉极域"));
+            AppendMenu(hMenu, MF_STRING, 3, UA("杀机房助手"));
+            AppendMenu(hMenu, MF_STRING, 4, UA("解禁系统程序"));
             AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hMenu, MF_STRING, 5, "退出");
+            AppendMenu(hMenu, MF_STRING, 5, UA("退出"));
             // 受保护的弹出菜单（对教师端监控不可见）
             int cmd = TrackPopupMenuProtected(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD,
                                               pt.x, pt.y, hWnd);
@@ -201,7 +222,8 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
                     }
                     break;
                 case 7: ExitBlackScreen(); break;
-                case 6: ToggleBroadcastWindow(); UpdateMythwareStatus(); break;
+                // 焦点可能就是悬浮窗自己（右键菜单刚关闭），不能最小化自己
+                case 6: MinimizeFocusWindow(); break;
                 case 2: if (hwnd) { ControlMythware(FALSE); UpdateMythwareStatus(); } break;
                 case 3: KillStudentAssistant(); break;
                 case 4: UnlockSystemPrograms(hwnd); break;
@@ -231,22 +253,24 @@ HWND CreateFloatingWindow(HINSTANCE hInstance) {
     if (!RegisterClassEx(&wc)) {
         LOG_ERROR("RegisterClassEx failed: err=%lu", GetLastError());
         char msg[128];
-        sprintf(msg, "悬浮窗 RegisterClassEx 失败\nGetLastError=%lu", GetLastError());
-        MessageBox(NULL, msg, "悬浮窗错误", MB_OK | MB_ICONERROR);
+        sprintf(msg, UA("悬浮窗 RegisterClassEx 失败\nGetLastError=%lu"), GetLastError());
+        MessageBox(NULL, msg, UA("悬浮窗错误"), MB_OK | MB_ICONERROR);
         return NULL;
     }
-    g_hFloating = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, "FloatingWnd", "",
+    // WS_EX_NOACTIVATE：点击悬浮窗不抢走当前应用的前台焦点，
+    // 这样“最小化焦点窗口”才能作用到用户真正在用的窗口。
+    g_hFloating = CreateWindowEx(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE, "FloatingWnd", "",
                                   WS_POPUP, 0, 0, FLOAT_SIZE, FLOAT_SIZE,
                                   NULL, NULL, hInstance, NULL);
     if (!g_hFloating) {
         LOG_ERROR("CreateWindowEx failed: err=%lu", GetLastError());
         char msg[128];
-        sprintf(msg, "悬浮窗 CreateWindowEx 失败\nGetLastError=%lu", GetLastError());
-        MessageBox(NULL, msg, "悬浮窗错误", MB_OK | MB_ICONERROR);
+        sprintf(msg, UA("悬浮窗 CreateWindowEx 失败\nGetLastError=%lu"), GetLastError());
+        MessageBox(NULL, msg, UA("悬浮窗错误"), MB_OK | MB_ICONERROR);
         return NULL;
     }
     ShowWindow(g_hFloating, SW_SHOW);
-    SetWindowDisplayAffinity(g_hFloating, WDA_EXCLUDEFROMCAPTURE);
+    ApplyAntiCapture(g_hFloating);
     LOG_INFO("CreateFloatingWindow OK (hwnd=%p)", g_hFloating);
     return g_hFloating;
 }
@@ -263,5 +287,33 @@ void ToggleFloatingWindow() {
         ShowWindow(g_hFloating, SW_HIDE);
     } else if (g_hFloating && IsWindow(g_hFloating)) {
         ShowWindow(g_hFloating, SW_SHOW);
+    }
+}
+
+void ResetFloatingWindowPos() {
+    if (g_hFloating && IsWindow(g_hFloating)) {
+        int sw = GetSystemMetrics(SM_CXSCREEN);
+        SetWindowPos(g_hFloating, HWND_TOPMOST, (sw - FLOAT_SIZE) / 2, 2,
+                     FLOAT_SIZE, FLOAT_SIZE, SWP_NOACTIVATE);
+    }
+}
+
+HWND GetFloatingWindow() {
+    return (g_hFloating && IsWindow(g_hFloating)) ? g_hFloating : NULL;
+}
+
+void MinimizeFocusWindow() {
+    // 前台是外部程序：直接最小化它（“任何焦点窗口”都适用）
+    HWND hFg = GetForegroundWindow();
+    if (hFg && !IsOwnWindow(hFg)) {
+        if (!IsHungAppWindow(hFg)) ShowWindow(hFg, SW_MINIMIZE);
+        return;
+    }
+    // 前台是本程序（例如刚点了悬浮窗右键菜单）：用最近记录的外部窗口
+    HWND hTarget = g_hLastExternal;
+    if (hTarget && IsWindow(hTarget) && IsWindowVisible(hTarget) &&
+        !IsIconic(hTarget) && !IsOwnWindow(hTarget) &&
+        !IsHungAppWindow(hTarget)) {
+        ShowWindow(hTarget, SW_MINIMIZE);
     }
 }

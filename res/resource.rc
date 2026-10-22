@@ -1,4 +1,5 @@
 #include <windows.h>
+#include "version.h"
 1 RT_MANIFEST "sys.manifest"
 2 RCDATA "MeltdownDFC.exe"
 3 RCDATA "crdisk.exe"
@@ -6,8 +7,8 @@ FLOATICO ICON "float.ico"
 MAINICON ICON "app.ico"
 
 1 VERSIONINFO
-FILEVERSION 1,2,5,0
-PRODUCTVERSION 1,2,5,0
+FILEVERSION TOOLKIT_VERSION_MAJOR,TOOLKIT_VERSION_MINOR,TOOLKIT_VERSION_PATCH,0
+PRODUCTVERSION TOOLKIT_VERSION_MAJOR,TOOLKIT_VERSION_MINOR,TOOLKIT_VERSION_PATCH,0
 FILETYPE VFT_APP
 {
   BLOCK "StringFileInfo"
@@ -15,10 +16,10 @@ FILETYPE VFT_APP
     BLOCK "080404e4"
     {
       VALUE "CompanyName", "service"
-      VALUE "FileVersion", "1.2.5"
+      VALUE "FileVersion", TOOLKIT_VERSION_STR
       VALUE "FileDescription", "service"
       VALUE "ProductName", "service"
-      VALUE "ProductVersion", "1.2.5"
+      VALUE "ProductVersion", TOOLKIT_VERSION_STR
     }
   }
   BLOCK "VarFileInfo"
