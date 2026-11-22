@@ -22,11 +22,26 @@ static void LoadFltLib() {
     }
 }
 
+// 读取一个 REG_DWORD；键值不存在、类型不符都当作“没有设置”
+// 注意 RegQueryValueEx 的 lpcbData 是【入/出】参数：入参必须是缓冲区真实大小。
+// v1.3.1 这里传的是未初始化的栈变量，一旦系统返回的字符串比 DWORD 长就会写穿栈，
+// 是 Win7 上 0xC0000005 崩溃的根源之一。
+static bool QueryDwordValue(HKEY key, LPCSTR name, DWORD* out) {
+    DWORD type = 0, cb = sizeof(DWORD), value = 0;
+    LONG ret = RegQueryValueEx(key, name, NULL, &type, (LPBYTE)&value, &cb);
+    if (ret != ERROR_SUCCESS || type != REG_DWORD) return false;
+    if (cb > sizeof(DWORD)) return false;
+    *out = value;
+    return true;
+}
+
 void UnlockSystemPrograms(HWND hwnd) {
-    BYTE cStatus = 0; HKEY retKey; LONG ret;
-    DWORD value = 0, out = 0, cb;
+    LOG_INFO("UnlockSystemPrograms start");
+    BYTE cStatus = 0; LONG ret;
+    DWORD out = 0;
     char szPath[BUFSIZ], outputBuf[BUFSIZ];
     std::string sMsg = AS("操作完成！已解禁以下项目：");
+    const std::string sep = AS("、");
 
     static const std::pair<LPCSTR, std::vector<std::pair<LPCSTR, LPCSTR>>> paths[] = {
         {"SOFTWARE\\Policies\\Microsoft\\Windows\\System", {{"DisableCMD","命令提示符"}}},
@@ -42,13 +57,20 @@ void UnlockSystemPrograms(HWND hwnd) {
         {"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings\\Zones\\3", {
             {"1803","IE下载限制"}, {"2200","IE ActiveX控件"}}}
     };
-    for (auto p : paths) {
-        RegOpenKeyEx(HKEY_CURRENT_USER, p.first, 0, KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-        for (auto v : p.second) {
-            ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
+    for (const auto& p : paths) {
+        // RegOpenKeyEx 失败时 retKey 是未初始化的垃圾值，绝不能拿去查询/关闭
+        HKEY retKey = NULL;
+        if (RegOpenKeyEx(HKEY_CURRENT_USER, p.first, 0,
+                         KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) != ERROR_SUCCESS) {
+            LOG_INFO("Unlock: open HKCU\\%s failed", p.first);
+            continue;
+        }
+        for (const auto& v : p.second) {
+            DWORD value = 0;
+            if (!QueryDwordValue(retKey, v.first, &out)) continue;
             if (out) {
-                ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += AS("、"); }
+                ret = RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += sep; }
             }
         }
         RegCloseKey(retKey);
@@ -60,14 +82,19 @@ void UnlockSystemPrograms(HWND hwnd) {
         {"SYSTEM\\ControlSet002\\Services\\usbstor", {{"Start","USB限制（控制集2）"}}},
         {"SYSTEM\\ControlSet003\\Services\\usbstor", {{"Start","USB限制（控制集3）"}}},
     };
-    value = 3;
-    for (auto p : paths2) {
-        RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-        for (auto v : p.second) {
-            ret = RegQueryValueEx(retKey, v.first, 0, NULL, (BYTE*)&out, &cb);
+    for (const auto& p : paths2) {
+        HKEY retKey = NULL;
+        if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0,
+                         KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) != ERROR_SUCCESS) {
+            LOG_INFO("Unlock: open HKLM\\%s failed", p.first);
+            continue;
+        }
+        for (const auto& v : p.second) {
+            DWORD value = 3;
+            if (!QueryDwordValue(retKey, v.first, &out)) continue;
             if (out == 4) {
-                ret &= RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
-                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += AS("、"); }
+                ret = RegSetValueEx(retKey, v.first, 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD));
+                if (ret == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += sep; }
             }
         }
         RegCloseKey(retKey);
@@ -83,12 +110,13 @@ void UnlockSystemPrograms(HWND hwnd) {
         {"Solitaire.exe","Win7纸牌"}, {"winmine.exe","扫雷（winmine.exe）"},
         {"Magnify.exe","放大镜"}, {"QQPCTray.exe","QQPCTray"}
     };
-    for (auto p : images) {
-        strcpy(szPath, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\");
-        strcat(szPath, p.first);
-        RegOpenKeyEx(HKEY_LOCAL_MACHINE, szPath, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
+    for (const auto& p : images) {
+        sprintf(szPath, "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\%s", p.first);
+        HKEY retKey = NULL;
+        if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, szPath, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) != ERROR_SUCCESS)
+            continue;
         if (RegDeleteValue(retKey, "debugger") == ERROR_SUCCESS) {
-            cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(p.second)); Println(outputBuf); sMsg += AS(p.second); sMsg += AS("、");
+            cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(p.second)); Println(outputBuf); sMsg += AS(p.second); sMsg += sep;
         }
         RegCloseKey(retKey);
     }
@@ -101,59 +129,111 @@ void UnlockSystemPrograms(HWND hwnd) {
         {"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", {{"HideFastUserSwitching","快速用户切换"}}},
         {"SOFTWARE\\Policies\\Microsoft\\WindowsStore", {{"RemoveWindowsStore","Windows应用商店"}}},
     };
-    for (auto p : deletePaths) {
-        RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-        for (auto v : p.second) {
-            if (RegDeleteValue(retKey, v.first) == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += AS("、"); }
+    for (const auto& p : deletePaths) {
+        HKEY retKey = NULL;
+        if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, p.first, 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) != ERROR_SUCCESS)
+            continue;
+        for (const auto& v : p.second) {
+            if (RegDeleteValue(retKey, v.first) == ERROR_SUCCESS) { cStatus = 1; sprintf(outputBuf, UA("解除%s成功"), UA(v.second)); Println(outputBuf); sMsg += AS(v.second); sMsg += sep; }
         }
         RegCloseKey(retKey);
     }
 
-    RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Policies\\Microsoft\\Internet Explorer\\Restrictions", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-    if (RegDeleteValue(retKey, "NoBrowserSaveAs") == ERROR_SUCCESS) { Println(UA("解除IE另存为成功")); sMsg += AS("IE另存为、"); cStatus = 1; }
-    RegCloseKey(retKey);
+    HKEY retKey = NULL;
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Policies\\Microsoft\\Internet Explorer\\Restrictions", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) == ERROR_SUCCESS) {
+        if (RegDeleteValue(retKey, "NoBrowserSaveAs") == ERROR_SUCCESS) { Println(UA("解除IE另存为成功")); sMsg += AS("IE另存为"); sMsg += sep; cStatus = 1; }
+        RegCloseKey(retKey);
+    }
 
-    RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-    if (RegDeleteValue(retKey, "ShowTaskViewButton") == ERROR_SUCCESS) { Println(UA("解除任务视图按钮成功")); sMsg += AS("任务视图按钮、"); cStatus = 1; }
-    RegCloseKey(retKey);
+    retKey = NULL;
+    if (RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) == ERROR_SUCCESS) {
+        if (RegDeleteValue(retKey, "ShowTaskViewButton") == ERROR_SUCCESS) { Println(UA("解除任务视图按钮成功")); sMsg += AS("任务视图按钮"); sMsg += sep; cStatus = 1; }
+        RegCloseKey(retKey);
+    }
 
-    RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey);
-    if (RegDeleteValue(retKey, "Scancode Map") == ERROR_SUCCESS) { Println(UA("解除键盘映射成功")); sMsg += AS("Tab键（键盘映射）、"); cStatus = 1; }
-    RegCloseKey(retKey);
+    retKey = NULL;
+    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) == ERROR_SUCCESS) {
+        if (RegDeleteValue(retKey, "Scancode Map") == ERROR_SUCCESS) { Println(UA("解除键盘映射成功")); sMsg += AS("Tab键（键盘映射）"); sMsg += sep; cStatus = 1; }
+        RegCloseKey(retKey);
+    }
 
-    LPCSTR path = "C:\\Windows\\System32\\drivers\\etc\\hosts";
-    bool bHandled = false;
-    HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    std::string tempPath = std::string(path) + ".tmp";
-    HANDLE hTemp = CreateFile(tempPath.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile != INVALID_HANDLE_VALUE && hTemp != INVALID_HANDLE_VALUE) {
-        char buf[4096]; DWORD read; std::string line;
-        while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0) {
-            for (DWORD i = 0; i < read; ++i) {
-                if (buf[i] == '\n') {
-                    if (line.find("127.0.0.1") != 0 || line.find_first_not_of(" \t") < line.find("127.0.0.1"))
-                    { line += '\n'; WriteFile(hTemp, line.c_str(), line.size(), NULL, NULL); }
-                    else bHandled = true;
-                    line.clear();
-                } else line += buf[i];
+    // ── hosts：去掉 127.0.0.1 重定向 ──
+    // 先整体读入内存、过滤完再写临时文件、最后用 MoveFileEx 原子替换。
+    // 旧实现边读边写、WriteFile 不传“已写字节数”、失败也照样删原文件，容易把 hosts 弄坏。
+    const char* path = "C:\\Windows\\System32\\drivers\\etc\\hosts";
+    HANDLE hFile = CreateFile(path, GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                              NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        LOG_WARN("Unlock: open hosts failed: err=%lu", GetLastError());
+    } else {
+        std::string hosts;
+        char buf[4096];
+        DWORD read = 0;
+        while (ReadFile(hFile, buf, sizeof(buf), &read, NULL) && read > 0)
+            hosts.append(buf, read);
+        CloseHandle(hFile);
+
+        std::string filtered;
+        bool bHandled = false;
+        size_t pos = 0;
+        while (pos < hosts.size()) {
+            size_t nl   = hosts.find('\n', pos);
+            size_t next = (nl == std::string::npos) ? hosts.size() : nl + 1;
+            const char* begin = hosts.data() + pos;
+            size_t len = next - pos;
+            size_t first = 0;
+            while (first < len && (begin[first] == ' ' || begin[first] == '\t')) ++first;
+            if (len - first >= 9 && memcmp(begin + first, "127.0.0.1", 9) == 0) {
+                bHandled = true;                    // 极域加的本地重定向，丢掉
+            } else {
+                filtered.append(begin, len);
+                if (nl == std::string::npos) filtered += '\n';
+            }
+            pos = next;
+        }
+
+        if (bHandled) {
+            std::string tempPath = std::string(path) + ".tmp";
+            HANDLE hTemp = CreateFile(tempPath.c_str(), GENERIC_WRITE, 0, NULL,
+                                      CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if (hTemp == INVALID_HANDLE_VALUE) {
+                LOG_WARN("Unlock: create %s failed: err=%lu", tempPath.c_str(), GetLastError());
+            } else {
+                DWORD written = 0;
+                BOOL ok = WriteFile(hTemp, filtered.data(), (DWORD)filtered.size(), &written, NULL);
+                FlushFileBuffers(hTemp);
+                CloseHandle(hTemp);
+                if (ok && written == filtered.size()) {
+                    SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL);
+                    if (MoveFileEx(tempPath.c_str(), path, MOVEFILE_REPLACE_EXISTING)) {
+                        LOG_INFO("Unlock: hosts rewritten (%lu -> %lu bytes)",
+                                 (unsigned long)hosts.size(), (unsigned long)filtered.size());
+                        cStatus = 1; sMsg += AS("网站限制"); sMsg += sep;
+                    } else {
+                        LOG_WARN("Unlock: MoveFileEx failed: err=%lu", GetLastError());
+                        DeleteFile(tempPath.c_str());
+                    }
+                } else {
+                    LOG_WARN("Unlock: write hosts.tmp failed (ok=%d, %lu/%lu)", (int)ok,
+                             (unsigned long)written, (unsigned long)filtered.size());
+                    DeleteFile(tempPath.c_str());
+                }
             }
         }
-        if (!line.empty()) {
-            if (line.find("127.0.0.1") != 0 || line.find_first_not_of(" \t") < line.find("127.0.0.1"))
-                WriteFile(hTemp, line.c_str(), line.size(), NULL, NULL);
-            else bHandled = true;
-        }
-        CloseHandle(hFile); CloseHandle(hTemp);
-        SetFileAttributes(path, FILE_ATTRIBUTE_NORMAL); DeleteFile(path);
-        if (bHandled && MoveFile(tempPath.c_str(), path)) { cStatus = 1; sMsg += AS("网站限制、"); }
     }
 
     SetWindowText(TxOut, UA("设置成功"));
     if (cStatus) {
-        sMsg.pop_back(); sMsg.pop_back(); sMsg += AS("。");
+        // 去掉末尾的分隔符：按字节 pop_back 会在非 GBK 代码页下切坏汉字
+        if (sMsg.size() >= sep.size() &&
+            sMsg.compare(sMsg.size() - sep.size(), sep.size(), sep) == 0)
+            sMsg.resize(sMsg.size() - sep.size());
+        sMsg += AS("。");
         sMsg += AS("请重启资源管理器以应用一些功能，如需恢复Tab键请注销后重新登录。");
         MessageBox(NULL, sMsg.c_str(), UA("说明"), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
     }
+    LOG_INFO("UnlockSystemPrograms done, changed=%d", (int)cStatus);
 }
 
 void RemoveNetworkRestrictions() {

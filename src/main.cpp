@@ -137,7 +137,9 @@ static void CheckCornerTrigger(HWND hwnd) {
     ResetFloatingWindowPos();
 
     HWND hFg = GetForegroundWindow();
-    if (hFg == GetFloatingWindow()) {
+    // 主面板/悬浮窗/本程序对话框都算“自己”：鼠标角落检测绝不能被用来把自己的窗口
+    // 最小化或关掉（面板正好在屏幕左上角，误伤概率很高）
+    if (IsOwnWindow(hFg)) {
         asking = false;
         g_cornerEnterTime = 0;
         g_wasInCorner = false;
@@ -162,6 +164,38 @@ static void CheckCornerTrigger(HWND hwnd) {
     g_cornerEnterTime = 0;
     g_wasInCorner = false;
 }
+
+// ── 主面板被别的置顶窗口压住时，重新压回置顶层最上面 ──
+// 现象：点了“广播窗口化”之后，极域的全屏广播/黑屏窗口会盖住工具，看起来像“面板闪一下就没了”。
+// 注意：已经置顶的窗口再 SetWindowPos(HWND_TOPMOST) 是空操作，必须走 ForceTopmost。
+static void EnsurePanelOnTop() {
+    if (!hwnd || !IsWindow(hwnd) || !IsWindowVisible(hwnd) || IsIconic(hwnd)) return;
+    if (IsPopupMenuOpen()) return;              // 菜单弹出期间不要抢 z 序
+    POINT pt = { 8, height / 2 };
+    ClientToScreen(hwnd, &pt);
+    HWND under = WindowFromPoint(pt);
+    if (!under) return;
+    HWND top = under;
+    while (GetParent(top)) top = GetParent(top);
+    if (top == hwnd || IsOwnWindow(top)) return;
+
+    // 只在“换了新的遮挡窗口”时记一条，避免每 2 秒刷屏
+    static HWND s_lastCover = NULL;
+    if (top != s_lastCover) {
+        s_lastCover = top;
+        char cls[64] = {}, title[128] = {}; DWORD pid = 0;
+        GetClassName(top, cls, sizeof(cls));
+        GetWindowText(top, title, sizeof(title));
+        GetWindowThreadProcessId(top, &pid);
+        LOG_WARN("Panel covered by %p [%s] \"%s\" pid=%lu -> re-raise", top, cls, title, pid);
+    }
+    ForceTopmost(hwnd);
+}
+
+// 区分“用户自己点了关闭/最小化”和“外部程序偷偷 ShowWindow/PostMessage”。
+// 前者一定先经过 WM_SYSCOMMAND(SC_CLOSE / SC_MINIMIZE)，后者不会。
+static bool g_closeFromUser    = false;
+static bool g_minimizeFromUser = false;
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) {
     switch (Message) {
@@ -315,7 +349,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
             switch (wParam) {
                 case 0: if (closingProcess) { closingProcess = false; KillTimer(hwnd, 3); HWND topHwnd = GetForegroundWindow(); DWORD pid; GetWindowThreadProcessId(topHwnd, &pid); if (pid != GetCurrentProcessId()) KillProcess(pid, KILL_FORCE); } else { closingProcess = true; SetTimer(hwnd, 3, GetDoubleClickTime(), NULL); } break;
                 case 1: MinimizeFocusWindow(); break;
-                case 2: ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); break;
+                case 2:
+                    LOG_INFO("Hotkey Alt+B: show panel");
+                    ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); ForceTopmost(hwnd);
+                    break;
             }
             return 0;
 
@@ -325,12 +362,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
                 SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
             switch (wParam) {
                 case 1: CheckCornerTrigger(hwnd); break;
-                case 2: SetWindowText(hwnd, RandomWindowTitle()); UpdateMythwareStatus(); break;
+                case 2: SetWindowText(hwnd, RandomWindowTitle()); UpdateMythwareStatus(); EnsurePanelOnTop(); break;
                 case 3: closingProcess = false; KillTimer(hwnd, 3); break;
             }
             break;
 
-        case WM_CLOSE: ShowWindow(hwnd, SW_HIDE); return TRUE;
+        case WM_CLOSE:
+            // 外部程序直接 PostMessage(WM_CLOSE) 时照样收起面板，是“界面显示秒没”的一种可能成因。
+            // 只有用户自己点的关闭（标题栏 ×、Alt+F4、系统菜单）才真正收起。
+            if (!g_closeFromUser) {
+                LOG_WARN("Panel external WM_CLOSE ignored");
+                return TRUE;
+            }
+            g_closeFromUser = false;
+            LOG_INFO("Panel WM_CLOSE -> hide");
+            ShowWindow(hwnd, SW_HIDE);
+            return TRUE;
 
         case WM_DESTROY:
             CloseLogFile();
@@ -363,8 +410,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_USER + 3:
-            if (lParam == WM_LBUTTONDBLCLK) { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); }
-            else if (lParam == WM_RBUTTONUP) { GetCursorPos(&pt); SetForegroundWindow(hwnd); HMENU hPopup = CreatePopupMenu(); AppendMenu(hPopup, MF_STRING, 1, UA("关闭程序")); AppendMenu(hPopup, MF_STRING, 2, UA("打开窗口")); int i = TrackPopupMenuProtected(hPopup, TPM_RETURNCMD, pt.x, pt.y, hwnd); if (i == 1) { DestroyFloatingWindow(); PostQuitMessage(0); } else if (i == 2) { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); } }
+            if (lParam == WM_LBUTTONDBLCLK) { LOG_INFO("Tray: show panel"); ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); ForceTopmost(hwnd); }
+            else if (lParam == WM_RBUTTONUP) { GetCursorPos(&pt); SetForegroundWindow(hwnd); HMENU hPopup = CreatePopupMenu(); AppendMenu(hPopup, MF_STRING, 1, UA("关闭程序")); AppendMenu(hPopup, MF_STRING, 2, UA("打开窗口")); int i = TrackPopupMenuProtected(hPopup, TPM_RETURNCMD, pt.x, pt.y, hwnd); if (i == 1) { DestroyFloatingWindow(); PostQuitMessage(0); } else if (i == 2) { LOG_INFO("Tray menu: show panel"); ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); ForceTopmost(hwnd); } }
             return FALSE;
 
         case WM_NOTIFY:
@@ -401,26 +448,47 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam) 
         case WM_NCHITTEST: { UINT nHitTest = DefWindowProc(hwnd, WM_NCHITTEST, wParam, lParam); if (nHitTest == HTCLIENT && GetAsyncKeyState(MK_LBUTTON) < 0) nHitTest = HTCAPTION; return nHitTest; }
 
         case WM_SYSCOMMAND:
+            // 低 4 位是系统保留位，比较前要屏蔽
+            if ((wParam & 0xFFF0) == SC_CLOSE)         g_closeFromUser = true;
+            else if ((wParam & 0xFFF0) == SC_MINIMIZE) g_minimizeFromUser = true;
             switch (wParam) {
                 case 2: { if (error == -1) error = GetLastError(); LPSTR szError = NULL; FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM, NULL, error, 0, (PTSTR)&szError, 0, NULL); char s[BUFSIZ] = {}; sprintf(s, UA("GetLastError上一次记录\n%u：%s"), error, szError); LocalFree(HLOCAL(szError)); MessageBox(hwnd, s, UA("上一次错误"), MB_OK | MB_ICONINFORMATION); error = -1; break; }
-                case 3: { HWND h = FindWindow("TaskManagerWindow", NULL); BYTE nCount = 0; if (!h) { DWORD value = 0; HKEY retKey; RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey); RegSetValueEx(retKey, "DisableTaskMgr", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD)); RegFlushKey(retKey); RegCloseKey(retKey); WinExec("taskmgr", SW_SHOW); ge; do { if (++nCount == 60) { SetWindowText(TxOut, UA("启动失败")); return FALSE; } Sleep(50); h = FindWindow("TaskManagerWindow", NULL); } while (!h); } HMENU hm = GetMenu(h); MENUITEMINFO mii = {sizeof(MENUITEMINFO), MIIM_STATE}; GetMenuItemInfo(hm, 0x7704, FALSE, &mii); if (!(mii.fState & MFS_CHECKED)) PostMessage(h, WM_COMMAND, 0x7704, 0); SetWindowText(TxOut, UA("设置完成")); break; }
+                case 3: { HWND h = FindWindow("TaskManagerWindow", NULL); BYTE nCount = 0; if (!h) { DWORD value = 0; HKEY retKey = NULL; if (RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System", 0, KEY_SET_VALUE | KEY_WOW64_32KEY, &retKey) == ERROR_SUCCESS) { RegSetValueEx(retKey, "DisableTaskMgr", 0, REG_DWORD, (CONST BYTE*)&value, sizeof(DWORD)); RegFlushKey(retKey); RegCloseKey(retKey); } WinExec("taskmgr", SW_SHOW); ge; do { if (++nCount == 60) { SetWindowText(TxOut, UA("启动失败")); return FALSE; } Sleep(50); h = FindWindow("TaskManagerWindow", NULL); } while (!h); } HMENU hm = GetMenu(h); MENUITEMINFO mii = {sizeof(MENUITEMINFO), MIIM_STATE}; GetMenuItemInfo(hm, 0x7704, FALSE, &mii); if (!(mii.fState & MFS_CHECKED)) PostMessage(h, WM_COMMAND, 0x7704, 0); SetWindowText(TxOut, UA("设置完成")); break; }
                 case 4: { char szTempPath[MAX_PATH]; GetTempPath(MAX_PATH, szTempPath); HANDLE hFile = CreateFile(strcat(szTempPath, "\\ToolkitLog.txt"), GENERIC_ALL, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, NULL); WriteFile(hFile, sOutPut.c_str(), sOutPut.size() + 1, NULL, NULL); FlushFileBuffers(hFile); ShellExecute(hwnd, "open", szTempPath, NULL, NULL, SW_SHOW); CloseHandle(hFile); break; }
                 case SC_MINIMIZE: SetActiveWindow(hwnd); focus = GetFocus(); break;
             }
             return DefWindowProc(hwnd, Message, wParam, lParam);
 
-        case WM_SIZE: if (wParam == SIZE_MINIMIZED) { ShowWindow(hwnd, SW_HIDE); return TRUE; } break;
+        case WM_SIZE:
+            if (wParam == SIZE_MINIMIZED) {
+                // 不是用户点的（SC_MINIMIZE）就说明是外部 ShowWindow(SW_MINIMIZE)，
+                // 直接恢复，不然面板会“闪一下就没了”
+                if (!g_minimizeFromUser) {
+                    LOG_WARN("Panel external minimize ignored -> restore");
+                    ShowWindow(hwnd, SW_RESTORE);
+                    return TRUE;
+                }
+                g_minimizeFromUser = false;
+                LOG_INFO("Panel minimized -> hide");
+                ShowWindow(hwnd, SW_HIDE);
+                return TRUE;
+            }
+            break;
 
         case WM_SHOWWINDOW:
+            LOG_INFO("Panel WM_SHOWWINDOW show=%d", (int)wParam);
             if (wParam) SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
             break;
 
         case WM_WINDOWPOSCHANGED: {
             // 事件驱动置顶：仅当其他窗口把本窗口挤下去时才重新置顶，避免无意义轮询
+            static bool inTopmostAdjust = false;   // ForceTopmost 会再触发一次本消息，防止递归
             WINDOWPOS* wp = (WINDOWPOS*)lParam;
-            if (!(wp->flags & SWP_NOZORDER) && IsWindowVisible(hwnd)) {
+            if (!(wp->flags & SWP_NOZORDER) && !inTopmostAdjust && IsWindowVisible(hwnd)) {
+                inTopmostAdjust = true;
                 SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                inTopmostAdjust = false;
             }
             return DefWindowProc(hwnd, Message, wParam, lParam);
         }

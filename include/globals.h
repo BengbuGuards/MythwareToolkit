@@ -157,3 +157,12 @@ void KillStudentAssistant();
 
 // floating — 受保护的弹出菜单（对教师端监控不可见）
 BOOL TrackPopupMenuProtected(HMENU hMenu, UINT uFlags, int x, int y, HWND hWnd);
+
+// 判断窗口是否属于本进程（悬浮窗/主面板/本程序的对话框）
+bool IsOwnWindow(HWND h);
+// 右键菜单是否正弹出（此时不要动主面板的 z 序）
+bool IsPopupMenuOpen();
+// 把窗口压到“置顶层”的最上面：
+// 对已经是置顶的窗口再调一次 SetWindowPos(HWND_TOPMOST) 是空操作，
+// 必须先退出置顶再重新置顶，才能压过极域的全屏广播/黑屏等其它置顶窗口。
+void ForceTopmost(HWND hWnd);

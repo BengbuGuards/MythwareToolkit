@@ -13,18 +13,54 @@ static RECT     g_dragStartRect;
 static bool     g_dragging  = false;
 static bool     g_hovered   = false;
 static UINT_PTR g_menuTimerId = 0;
+static HWND     g_menuFgAtOpen = NULL;   // 菜单弹出时的前台窗口
+static bool     g_menuDismissed = false;
 
-// 定时器回调：查找并保护所有弹出菜单窗口
+// 菜单是不是被别的窗口抢走了前台（失去焦点）
+// 悬浮窗是 WS_EX_NOACTIVATE，菜单本身拿不到真正的前台，所以只能用
+// “前台窗口从菜单/属主/弹出时的那个窗口变成别的窗口”来判断。
+static bool MenuLostFocus(HWND hMenu) {
+    HWND owner = GetWindow(hMenu, GW_OWNER);
+    HWND fg = GetForegroundWindow();
+    // 弹出时就没记到前台（极少见），无法判断“变化”，宁可不动
+    if (!fg || !g_menuFgAtOpen) return false;
+    if (fg == hMenu || fg == owner || fg == g_menuFgAtOpen) return false;
+    return true;
+}
+
+// 主动收起当前菜单：EndMenu 结束本线程的活动菜单，WM_CANCELMODE 兜底
+static void DismissMenu(HWND hMenu) {
+    HWND fg = GetForegroundWindow();
+    char cls[64] = {}, title[128] = {}; DWORD pid = 0;
+    if (fg) {
+        GetClassName(fg, cls, sizeof(cls));
+        GetWindowText(fg, title, sizeof(title));
+        GetWindowThreadProcessId(fg, &pid);
+    }
+    LOG_INFO("Menu lost focus (fg=%p [%s] \"%s\" pid=%lu) -> dismiss", fg, cls, title, pid);
+    EndMenu();
+    if (IsWindow(hMenu)) PostMessage(hMenu, WM_CANCELMODE, 0, 0);
+}
+
+// 定时器回调：查找并保护所有弹出菜单窗口；本进程的菜单失去焦点时收起
 static VOID CALLBACK MenuProtectTimer(HWND, UINT, UINT_PTR, DWORD) {
     HWND hMenu = FindWindow("#32768", NULL);
     while (hMenu) {
         ApplyAntiCapture(hMenu);
+        // 只处理自己的菜单（FindWindow 会把别的进程的菜单也找出来）
+        if (!g_menuDismissed && IsOwnWindow(hMenu) && MenuLostFocus(hMenu)) {
+            g_menuDismissed = true;
+            DismissMenu(hMenu);
+            return;
+        }
         hMenu = FindWindowEx(NULL, hMenu, "#32768", NULL);
     }
 }
 
 // 受保护的 TrackPopupMenu：弹出菜单对教师端屏幕监控不可见
 BOOL TrackPopupMenuProtected(HMENU hMenu, UINT uFlags, int x, int y, HWND hWnd) {
+    g_menuFgAtOpen  = GetForegroundWindow();
+    g_menuDismissed = false;
     g_menuTimerId = SetTimer(NULL, 0, 10, MenuProtectTimer);
     LOG_INFO("TrackPopupMenu with anti-capture timer (id=%lu)", g_menuTimerId);
     BOOL ret = TrackPopupMenu(hMenu, uFlags, x, y, 0, hWnd, NULL);
@@ -33,14 +69,8 @@ BOOL TrackPopupMenuProtected(HMENU hMenu, UINT uFlags, int x, int y, HWND hWnd) 
     return ret;
 }
 
-// 验证图标句柄是否有效（避免畸形 .ico 文件导致 DrawIconEx 崩溃）
-// 是否是本程序自己的窗口（含悬浮窗、主窗口、对话框）
-static bool IsOwnWindow(HWND h) {
-    if (!h) return true;
-    DWORD pid = 0;
-    GetWindowThreadProcessId(h, &pid);
-    return pid == GetCurrentProcessId();
-}
+// 是否是本程序自己的窗口（含悬浮窗、主窗口、对话框）—— 实现在 utils.cpp
+bool IsPopupMenuOpen() { return g_menuTimerId != 0; }
 
 // 记录最近一个外部程序的前台窗口：点悬浮窗后前台会变成悬浮窗自己，
 // 需要靠这个值把“最小化焦点窗口”作用到用户真正在用的那个窗口上。
@@ -180,16 +210,29 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             GetWindowRect(hWnd, &g_dragStartRect);
             SetCapture(hWnd);
             break;
-        case WM_LBUTTONUP:
+        case WM_LBUTTONUP: {
             ReleaseCapture();
             if (!g_dragging) {
+                // 双击会连发两次 LBUTTONUP，先显示再隐藏，看起来就是“面板闪一下就没了”。
+                // 300ms 内只认第一次切换。
+                static DWORD s_lastToggle = 0;
+                DWORD now = GetTickCount();
+                if (now - s_lastToggle < 300) break;
+                s_lastToggle = now;
                 if (hwnd && IsWindow(hwnd)) {
-                    if (IsWindowVisible(hwnd))
+                    if (IsWindowVisible(hwnd)) {
+                        LOG_INFO("Floating click: hide panel");
                         ShowWindow(hwnd, SW_HIDE);
-                    else { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); }
+                    } else {
+                        LOG_INFO("Floating click: show panel");
+                        ShowWindow(hwnd, SW_SHOWNORMAL);
+                        SetForegroundWindow(hwnd);
+                        ForceTopmost(hwnd);
+                    }
                 }
             }
             break;
+        }
         case WM_MBUTTONDOWN: {
             if (hwnd && IsWindow(hwnd)) {
                 ToggleBroadcastWindow();
@@ -217,8 +260,12 @@ LRESULT CALLBACK FloatingWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPar
             switch (cmd) {
                 case 1:
                     if (hwnd && IsWindow(hwnd)) {
-                        if (IsWindowVisible(hwnd)) ShowWindow(hwnd, SW_HIDE);
-                        else { ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd); }
+                        if (IsWindowVisible(hwnd)) { LOG_INFO("Menu: hide panel"); ShowWindow(hwnd, SW_HIDE); }
+                        else {
+                            LOG_INFO("Menu: show panel");
+                            ShowWindow(hwnd, SW_SHOWNORMAL); SetForegroundWindow(hwnd);
+                            ForceTopmost(hwnd);
+                        }
                     }
                     break;
                 case 7: ExitBlackScreen(); break;

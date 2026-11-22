@@ -16,7 +16,7 @@
 <br clear="left">
 *主界面（左） · 任务栏托盘（中） · 悬浮窗右键菜单（右）*
 
-**当前版本：v1.3.1**
+**当前版本：v1.3.2，图示版本号：2.0.0（2.x.x 版本已经统一为1.3.0）**
 
 ---
 
@@ -69,27 +69,27 @@
 ## 使用教程
 
 #### 两个版本怎么选
-> 提供 **x64** 与 **x86** 两个架构：`MythwareToolkit.v1.3.1.x64.exe` / `MythwareToolkit.v1.3.1.x86.exe`。
-> `v1.3.1` 表示版本号，`x64`/`x86` 表示架构；请选择与系统匹配的版本。
+> 提供 **x64** 与 **x86** 两个架构：`MythwareToolkit.v1.3.2.x64.exe` / `MythwareToolkit.v1.3.2.x86.exe`。
+> `v1.3.2` 表示版本号，`x64`/`x86` 表示架构；请选择与系统匹配的版本。
 
-- 优先尝试与系统架构匹配的 `MythwareToolkit.v1.3.1.<架构>.exe`
-- 如果直接双击不可行，下载对应架构的 `MythwareToolkit.v1.3.1.<架构>.zip`
-- 也可尝试便携版 `MythwareToolkit.v1.3.1.<架构>.Portable.exe`
+- 优先尝试与系统架构匹配的 `MythwareToolkit.v1.3.2.<架构>.exe`
+- 如果直接双击不可行，下载对应架构的 `MythwareToolkit.v1.3.2.<架构>.zip`
+- 也可尝试便携版 `MythwareToolkit.v1.3.2.<架构>.Portable.exe`
 
 ### 便携版
 
-下载与系统架构匹配的 `MythwareToolkit.v1.3.1.<架构>.Portable.exe`（`x64` 或 `x86`），**双击运行**即可。
+下载与系统架构匹配的 `MythwareToolkit.v1.3.2.<架构>.Portable.exe`（`x64` 或 `x86`），**双击运行**即可。
 
 - ✅ 免安装、免签名
 - ✅ 悬浮窗 + 完整功能
 - ⚠️ 不能覆盖任务管理器（普通置顶）
 
-### 超级置顶版（`MythwareToolkit.v1.3.1.<架构>.zip` 使用教程）
+### 超级置顶版（`MythwareToolkit.v1.3.2.<架构>.zip` 使用教程）
 
 [从服务器返回一个参照解决方法](/cert/从服务器返回一个参照解决方法.md)
 
 ## 一句话解决
-下载与系统架构匹配的 **`MythwareToolkit.v1.3.1.<架构>.zip`**（`x64` 或 `x86`）解压后，双击 `deploy.bat` → 给权限，等待完成 → 从桌面快捷方式启动。
+下载与系统架构匹配的 **`MythwareToolkit.v1.3.2.<架构>.zip`**（`x64` 或 `x86`）解压后，双击 `deploy.bat` → 给权限，等待完成 → 从桌面快捷方式启动。
 
 > **为什么必须用 deploy.bat？** UIAccess 是 Windows 安全机制：exe 必须已签名、证书必须受信任、**且 exe 必须在 `C:\Program Files\` 下**。放桌面或别处会一直弹窗，即使装了证书也没用。`deploy.bat` 一步搞定这三个条件。
 

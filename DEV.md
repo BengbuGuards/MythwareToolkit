@@ -60,8 +60,8 @@ cert\deploy.bat              →  部署到 C:\Program Files\
 | 脚本 | 做什么 | 输出 |
 |------|--------|------|
 | `scripts\build.bat [x64\|x86]` | 编译 + 自动签名；无参数时交互选择架构 | `bin\MythwareToolkit.v<版本号>.<arch>.exe` |
-| `scripts\build_portable.bat [x64\|x86]` | 编译便携版；无参数时交互选择架构 | `bin\MythwareToolkit.v<版本号>.<arch>.Portable.exe` |
-| `scripts\package.bat` | 一次构建 + 签名两个架构，各打一个 ZIP | `bin\pkg\MythwareToolkit.v<版本号>.x64.zip`、`.x86.zip` |
+| `scripts\build_portable.bat [x64\|x86\|both]` | 编译便携版；无参数时交互选择架构，选 `both` 一次出两个架构 | `bin\MythwareToolkit.v<版本号>.<arch>.Portable.exe` |
+| `scripts\package.bat` | 一次构建 + 签名两个架构，各打一个 ZIP，输出 exe/zip 的 SHA-256；结束后 `bin\pkg` 只保留 **2 个 exe + 2 个 zip** | `bin\pkg\MythwareToolkit.v<版本号>.x64.zip`、`.x86.zip` |
 | `cert\deploy.bat` | 部署到 Program Files + 桌面快捷方式 | `C:\Program Files\MythwareToolkit\` |
 
 > `build.bat` 支持 `NOSIGN=1`（跳过签名）和 `NOPAUSE=1`（不暂停），`package.bat` 在 `NOSIGN=1` 下无需管理员权限。
@@ -175,7 +175,7 @@ Makefile 支持 `mingw32-make ARCH=x64|x86` 和 `mingw32-make ARCH=x86 portable`
 
 ## 版本号规范
 
-和原开发者沟通后，将原先定为 2.0.x 的更改为 1.3.0，现版本为 **1.3.1**。
+和原开发者沟通后，将原先定为 2.0.x 的更改为 1.3.0，现版本为 **1.3.2**。
 
 版本号单一来源在 `include/version.h`：升级时只改该文件，`main.cpp` / `resource.rc` / `scripts\package.bat` 自动引用。文档（README / CHANGELOG）里的版本号仍需发版时手动同步。
 
