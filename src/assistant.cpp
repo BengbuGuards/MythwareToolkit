@@ -3,14 +3,15 @@
 
 void KillStudentAssistant() {
     char version[6] = {};
-    HKEY retKey;
+    HKEY retKey = NULL;
     LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
                   UA("SOFTWARE\\WOW6432Node\\ZM软件工作室\\学生机房管理助手"),
                   0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
+    // 必须先判断打开结果：失败时 retKey 是垃圾值，查询/关闭它都可能直接崩
+    if (ret != ERROR_SUCCESS) { ge; SetWindowText(TxOut, UA("执行失败，可能未安装学生机房管理助手")); return; }
     DWORD size = sizeof(version);
     RegQueryValueEx(retKey, "Version", NULL, NULL, (LPBYTE)&version, &size);
     RegCloseKey(retKey);
-    if (ret != ERROR_SUCCESS) { ge; SetWindowText(TxOut, UA("执行失败，可能未安装学生机房管理助手")); return; }
 
     SC_HANDLE sc = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
     SC_HANDLE zm = OpenService(sc, "zmserv", SERVICE_STOP);

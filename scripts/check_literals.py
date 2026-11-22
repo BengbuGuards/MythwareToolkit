@@ -29,10 +29,10 @@ WRAPPERS = ("UA", "AS")
 ALLOW = [
     # bypass.cpp 的静态表：pair 的 .second 是给人看的显示名，表本身只存 UTF-8，
     # 真正送进 API 前统一在遍历处转 —— 见 `UA(v.second)` / `AS(p.second)`。
-    ("src/bypass.cpp", 32, 43, "静态表 .second 显示名，遍历处已 UA()/AS()"),
-    ("src/bypass.cpp", 58, 61, "同上"),
-    ("src/bypass.cpp", 76, 84, "同上"),
-    ("src/bypass.cpp", 96, 102, "同上"),
+    ("src/bypass.cpp", 46, 59, "静态表 .second 显示名，遍历处已 UA()/AS()"),
+    ("src/bypass.cpp", 79, 84, "同上"),
+    ("src/bypass.cpp", 103, 112, "同上"),
+    ("src/bypass.cpp", 124, 131, "同上"),
 
     # psd.cpp：对话框模板的标题必须写成 UTF-16 塞进 DLGTEMPLATE，
     # 源码字面量是 UTF-8，所以这里显式用 CP_UTF8 转换 —— 转完即宽字符，

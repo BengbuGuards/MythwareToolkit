@@ -3,8 +3,8 @@ cd /d "%~dp0.."
 setlocal enabledelayedexpansion
 
 :: ============================================================
-::  Usage: scripts\build_portable.bat [x64^|x86]
-::  Default arch is x64.
+::  Usage: scripts\build_portable.bat [x64^|x86^|both]
+::  Default arch is x64. "both" builds x64 and x86 in one run.
 :: ============================================================
 set ARCH=%~1
 if "%ARCH%"=="" (
@@ -13,14 +13,25 @@ if "%ARCH%"=="" (
         set ARCH=x64
     ) else (
         echo Select target architecture:
-        echo   [1] x64 - 64-bit Windows
-        echo   [2] x86 - 32-bit Windows
-        choice /c 12 /n /m "Enter choice [1/2]: "
-        if errorlevel 2 (set ARCH=x86) else (set ARCH=x64)
+        echo   [1] x64  - 64-bit Windows
+        echo   [2] x86  - 32-bit Windows
+        echo   [3] both - x64 + x86
+        choice /c 123 /n /m "Enter choice [1/2/3]: "
+        if errorlevel 3 (set ARCH=both) else if errorlevel 2 (set ARCH=x86) else (set ARCH=x64)
     )
 )
+
+:: Build both architectures by re-invoking this script
+if /i "%ARCH%"=="both" (
+    set "NOPAUSE=1"
+    call "%~f0" x64
+    if errorlevel 1 exit /b 1
+    call "%~f0" x86
+    exit /b %ERRORLEVEL%
+)
+
 if /i not "%ARCH%"=="x64" if /i not "%ARCH%"=="x86" (
-    echo ERROR: arch must be x64 or x86
+    echo ERROR: arch must be x64, x86 or both
     if not defined NOPAUSE pause
     exit /b 1
 )

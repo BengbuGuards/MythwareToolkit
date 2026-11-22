@@ -156,11 +156,12 @@ void ControlMythware(BOOL kill) {
             UpdateMythwareStatus();
         } else { ge; SetWindowText(TxOut, UA("执行失败")); }
     } else {
-        HKEY retKey; char szPath[MAX_PATH * 2];
+        HKEY retKey = NULL; char szPath[MAX_PATH * 2] = {};
         LONG ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
                       "SOFTWARE\\TopDomain\\e-Learning Class Standard\\1.00",
                       0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &retKey);
-        if (ret != ERROR_SUCCESS) { ge; SetWindowText(TxOut, UA("获取路径失败")); RegCloseKey(retKey); return; }
+        // 打开失败时 retKey 不可用，不能再 RegCloseKey
+        if (ret != ERROR_SUCCESS) { ge; SetWindowText(TxOut, UA("获取路径失败")); return; }
         DWORD dataLong = MAX_PATH * 2, type = REG_SZ;
         ret = RegQueryValueEx(retKey, "TargetDirectory", 0, &type, LPBYTE(szPath), &dataLong);
         RegCloseKey(retKey);

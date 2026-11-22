@@ -21,6 +21,18 @@ echo.
 
 set "NOPAUSE=1"
 
+:: Clean previous outputs so bin\pkg ends up with exactly 2 exe + 2 zip
+echo [*] Cleaning old package artifacts...
+if exist bin\pkg (
+    rmdir /s /q "bin\pkg\MythwareToolkit"       2>nul
+    rmdir /s /q "bin\pkg\MythwareToolkit.x64"   2>nul
+    rmdir /s /q "bin\pkg\MythwareToolkit.x86"   2>nul
+    del /f /q "bin\pkg\MythwareToolkit*.exe"    2>nul
+    del /f /q "bin\pkg\MythwareToolkit*.zip"    2>nul
+    del /f /q "bin\pkg\SHA256SUMS.txt"          2>nul
+)
+echo.
+
 echo [1/4] Build + Sign x64...
 call scripts\build.bat x64
 if errorlevel 1 goto :fail
@@ -49,6 +61,10 @@ echo   Package SUCCESS!
 echo   bin\pkg\MythwareToolkit.%VERSION%.x64.zip
 echo   bin\pkg\MythwareToolkit.%VERSION%.x86.zip
 echo ========================================
+echo.
+echo [*] SHA-256 checksums...
+powershell -NoProfile -Command "$files = @(Get-ChildItem 'bin\pkg\MythwareToolkit.*.exe') + @(Get-ChildItem 'bin\pkg\*.zip'); foreach ($f in $files) { ((Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $f.Name) }"
+echo ========================================
 pause
 exit /b 0
 
@@ -69,6 +85,8 @@ set "ZIPFILE=%CD%\bin\pkg\MythwareToolkit.%VERSION%.%ARCH%.zip"
 if exist "%ZIPFILE%" del /f /q "%ZIPFILE%"
 powershell -NoProfile -Command "Compress-Archive -Path '%PKGDIR%\*' -DestinationPath '%ZIPFILE%'"
 if errorlevel 1 exit /b 1
+:: Remove the staging folder; only the exe and zip stay in bin\pkg
+rmdir /s /q "%PKGDIR%" 2>nul
 echo   %ZIPFILE%
 exit /b 0
 

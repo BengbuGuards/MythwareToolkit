@@ -137,12 +137,17 @@ if defined NOSIGN (
     )
 )
 
+:: SHA-256 is computed after signing, so it matches the final file
+set "EXEHASH="
+for /f "usebackq delims=" %%h in (`powershell -NoProfile -Command "(Get-FileHash -Algorithm SHA256 '%EXEFILE%').Hash"`) do set "EXEHASH=%%h"
+
 echo.
 echo ========================================
 echo   Build + Sign SUCCESS! (%ARCH%)
 echo ========================================
 echo   File : %EXEFILE%
 echo   Size : %FILESIZE% bytes
+echo   SHA-256: !EXEHASH!
 echo   Next : cert\deploy.bat
 echo ========================================
 if not exist bin\pkg mkdir bin\pkg

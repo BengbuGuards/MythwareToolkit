@@ -469,21 +469,32 @@ LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* exceptionInfo) {
         (DWORD)addr, modName, (DWORD)(addr - modBase),
         UA((er->ExceptionFlags & EXCEPTION_NONCONTINUABLE) ? "该错误不可继续执行" : "该错误可尝试继续执行"));
 #endif
+    // 不再提供「继续执行」：异常指令被重试只会原样再崩一次。
+    // 旧实现里点「继续」会返回 EXCEPTION_CONTINUE_EXECUTION，
+    // Win7 崩溃日志中同一处 WriteFile 连续刷了 8 条记录就是这么来的。
     HHOOK hCBTHook = SetWindowsHookEx(WH_CBT, CBTProc, NULL, GetCurrentThreadId());
-    int id = MessageBox(NULL, message, UA("程序运行异常"), MB_ICONERROR | MB_YESNO | MB_DEFBUTTON2);
+    MessageBox(NULL, message, UA("程序运行异常"), MB_ICONERROR | MB_OK | MB_SETFOREGROUND);
     UnhookWindowsHookEx(hCBTHook);
-    if (id == IDYES) {
-        return EXCEPTION_CONTINUE_SEARCH;
-    } else if (id == IDNO) {
-        return (er->ExceptionFlags & EXCEPTION_NONCONTINUABLE) ?
-               EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_EXECUTION;
-    }
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
 BOOL CALLBACK SetWindowFont(HWND hwndChild, LPARAM lParam) {
     SendMessage(hwndChild, WM_SETFONT, WPARAM(lParam), 0);
     return TRUE;
+}
+
+// ── 窗口归属 / 置顶 ──
+bool IsOwnWindow(HWND h) {
+    if (!h) return true;
+    DWORD pid = 0;
+    GetWindowThreadProcessId(h, &pid);
+    return pid == GetCurrentProcessId();
+}
+
+void ForceTopmost(HWND hWnd) {
+    if (!hWnd || !IsWindow(hWnd)) return;
+    SetWindowPos(hWnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetWindowPos(hWnd, HWND_TOPMOST,   0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 // ── 防教师端截屏 ──
@@ -568,9 +579,6 @@ LRESULT CALLBACK CBTProc(int nCode, WPARAM wParam, LPARAM lParam) {
             } else if (_stricmp(szName, "USB Setting") == 0) {
                 SetDlgItemText(msgHwnd, IDYES, UA("软解禁"));
                 SetDlgItemText(msgHwnd, IDNO, UA("硬解禁"));
-            } else if (_stricmp(szName, UA("程序运行异常")) == 0) {
-                SetDlgItemText(msgHwnd, IDYES, UA("终止程序"));
-                SetDlgItemText(msgHwnd, IDNO, UA("继续"));
             }
         }
     }
